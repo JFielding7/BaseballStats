@@ -7,7 +7,7 @@ pub(crate) struct Statistics {
 
 #[derive(Debug, Deserialize)]
 struct Stat {
-    splits: Split
+    splits: (Split,)
 }
 
 #[derive(Debug, Deserialize)]
@@ -17,7 +17,7 @@ struct Split {
 
 #[derive(Debug, Deserialize)]
 struct AdvancedStat {
-    splits: AdvancedSplit
+    splits: (AdvancedSplit, )
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,7 +55,7 @@ struct BatterStats {
     atBatsPerHomeRun: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct BatterAdvancedStats {
     pitchesPerPlateAppearance: String,
     walksPerPlateAppearance: String,
