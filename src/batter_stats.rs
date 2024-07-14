@@ -63,3 +63,14 @@ struct BatterAdvancedStats {
     homeRunsPerPlateAppearance: String,
     walksPerStrikeout: String
 }
+
+pub(crate) fn get_batter_stats() -> Statistics {
+    const URL: &str = "https://statsapi.mlb.com/api/v1/people/630105/stats?stats=career,careerAdvanced&group=hitting";
+    let response = reqwest::blocking::get(URL).unwrap();
+    let data: Statistics = response.json().unwrap();
+    data
+}
+
+fn display() {
+    let res = get_batter_stats();
+}
