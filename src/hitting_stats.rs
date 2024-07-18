@@ -1,37 +1,50 @@
+use std::env;
 use std::fs::File;
 use std::io::{BufReader, Read, Result, Seek, SeekFrom};
 use std::process::id;
+use std::str::ParseBoolError;
+use chrono::format::Item::Error;
 use serde::Deserialize;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;
 use term_table::{Table};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub(crate) struct Statistics {
     stats: (Stat, AdvancedStat)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Stat {
-    splits: (Split,)
+    splits: Vec<Split>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct Split {
-    stat: BatterStats
+    #[serde(default = "default_season")]
+    season: String,
+    stat: BatterStats,
+    player: Player
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
+struct Player {
+    fullName: String
+}
+
+#[derive(Deserialize, Debug)]
 struct AdvancedStat {
-    splits: (AdvancedSplit, )
+    splits: Vec<AdvancedSplit>
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct AdvancedSplit {
-    stat: BatterAdvancedStats
+    #[serde(default = "default_season")]
+    season: String,
+    stat: AdvancedBatterStats
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct BatterStats {
     gamesPlayed: i32,
     runs: i32,
@@ -61,34 +74,63 @@ struct BatterStats {
     atBatsPerHomeRun: String
 }
 
-#[derive(Deserialize)]
-struct BatterAdvancedStats {
+#[derive(Deserialize, Debug)]
+struct AdvancedBatterStats {
     pitchesPerPlateAppearance: String,
     walksPerPlateAppearance: String,
     strikeoutsPerPlateAppearance: String,
     homeRunsPerPlateAppearance: String,
     walksPerStrikeout: String,
-    iso: String
 }
 
-macro_rules! table {
-    ($cols:expr, $($cell:expr),*) => {
+fn default_season() -> String {
+    "ALL".to_string()
+}
+
+// macro_rules! table {
+//     ($cols:expr, $($cell:expr),*) => {
+//         {
+//             let mut table = Table::new();
+//             let mut row = Vec::new();
+//             let mut i = 0;
+//             $(
+//                 row.push(TableCell::new($cell));
+//                 i += 1;
+//                 if i == $cols {
+//                     table.add_row(Row::new(row));
+//                     row = Vec::new();
+//                     i = 0;
+//                 }
+//             )*
+//             table
+//         }
+//     };
+// }
+
+macro_rules! row {
+    ($($cell:expr),*) => {
         {
-            let mut table = Table::new();
             let mut row = Vec::new();
-            let mut i = 0;
-            $(
-                row.push(TableCell::new($cell));
-                i += 1;
-                if i == $cols {
-                    table.add_row(Row::new(row));
-                    row = Vec::new();
-                    i = 0;
-                }
-            )*
-            table
+            $(row.push(TableCell::new($cell));)*
+            Row::new(row)
         }
     };
+}
+
+fn display_stat_table(stats: &Statistics) -> Table {
+    let mut table = Table::new();
+    let header = row!("Year", "G", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BA", "OBP", "SLG", "OPS", "SO", "BB", "HBP");
+    table.add_row(header);
+
+    for split in &stats.stats.0.splits {
+        let stat_group = &split.stat;
+        table.add_row(row!(&split.season, stat_group.gamesPlayed, stat_group.plateAppearances,
+            stat_group.atBats, stat_group.runs, stat_group.hits, stat_group.doubles,
+            stat_group.triples, stat_group.homeRuns, stat_group.rbi, &stat_group.avg,
+            &stat_group.obp, &stat_group.slg, &stat_group.ops, stat_group.strikeOuts,
+            stat_group.baseOnBalls, stat_group.hitByPitch));
+    }
+    table
 }
 
 fn get_line_length(file: &File) -> u64 {
@@ -106,7 +148,7 @@ fn get_line_length(file: &File) -> u64 {
     i
 }
 
-fn get_player_id(player: &String) -> Result<(i32)> {
+fn get_player_id(player: &String) -> Result<i32> {
     const ID_LENGTH: usize = 6;
 
     let bytes = player.as_bytes();
@@ -124,8 +166,6 @@ fn get_player_id(player: &String) -> Result<(i32)> {
         let mid = (start + end >> 1) / line_len * line_len;
         player_file.seek(SeekFrom::Start(mid))?;
         player_file.read_exact(&mut buffer)?;
-
-        println!("{} {} {}: {}", start, mid, end, String::from_utf8(buffer.to_vec()).unwrap());
 
         let mut cmp: i8 = 0;
         for i in 0..buffer.len() {
@@ -161,14 +201,28 @@ fn get_player_id(player: &String) -> Result<(i32)> {
     Ok(-1)
 }
 
-fn get_hitting_stats(player_id: i32) -> Statistics {
-    let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats=career,careerAdvanced&group=hitting", player_id);
-    let response: Statistics = reqwest::blocking::get(url).unwrap().json().unwrap();
-    response
+fn get_hitting_stats(player_id: i32, season_type: &str) -> Statistics {
+    let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats={},{}Advanced&group=hitting", player_id, season_type, season_type);
+    reqwest::blocking::get(url).unwrap().json().unwrap()
 }
 
-pub(crate) fn display_hitting_stats(player: &String) {
-    println!("{:?}", get_player_id(player));
-    // let table = table!(3, "Name", "Age", "Occupation", "John Doe", "30", "Software Developer");
-    // println!("{}", table.render());
+pub(crate) fn display_hitting_stats(query: Vec<String>) {
+    if query.len() == 1 {
+        return;
+    }
+    let season_type: &str;
+    if query.len() == 2 {
+        season_type = "season";
+    }
+    else {
+        match query[2].to_ascii_lowercase().chars().next().unwrap() {
+            'c' => season_type = "career",
+            'y' => season_type = "yearByYear",
+            _ => season_type = "season"
+        }
+    }
+    let stats = get_hitting_stats(get_player_id(&query[1]).unwrap(), season_type);
+    println!("\nPlayer: {}\n", &stats.stats.0.splits[0].player.fullName);
+    let table = display_stat_table(&stats);
+    println!("{}", table.render());
 }

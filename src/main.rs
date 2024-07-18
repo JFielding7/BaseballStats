@@ -7,5 +7,6 @@ mod database_generator;
 mod teams;
 
 fn main() {
-    hitting_stats::display_hitting_stats(&"ronald-acuna-jr".to_string());
+    let query = env::args().collect();
+    hitting_stats::display_hitting_stats(query);
 }
