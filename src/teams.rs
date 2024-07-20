@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use reqwest::blocking::get;
 use crate::data_id::get_id;
-use crate::hitting_stats::BasicStatistics;
+use crate::hitting_stats::BasicHittingStats;
 
 #[derive(Deserialize)]
 struct Roster {
@@ -39,15 +39,15 @@ macro_rules! pitching_stats_url {
     () => { "https://statsapi.mlb.com/api/v1/people/{}/stats?stats=season&group=pitching" };
 }
 
-fn get_team_hitting_stats(roster: &Roster) -> Vec<BasicStatistics> {
-    let mut hitter_stats: Vec<BasicStatistics> = roster.roster.iter().filter_map(|player: &Player| {
+fn get_team_hitting_stats(roster: &Roster) -> Vec<BasicHittingStats> {
+    let mut hitter_stats: Vec<BasicHittingStats> = roster.roster.iter().filter_map(|player: &Player| {
         println!("{}", &player.person.fullName);
         if &player.position.abbreviation == PITCHER {
             return None;
         }
         Some(get(format!(hitting_stats_url!(), player.person.id)).unwrap().json().unwrap())
     }).collect();
-    hitter_stats.sort_by(|stats0: &BasicStatistics, stats1: &BasicStatistics|
+    hitter_stats.sort_by(|stats0: &BasicHittingStats, stats1: &BasicHittingStats|
         stats0.stats.0.splits[0].stat.gamesPlayed.cmp(&stats1.stats.0.splits[0].stat.gamesPlayed)
     );
     println!("{}", hitter_stats.len());
@@ -55,7 +55,7 @@ fn get_team_hitting_stats(roster: &Roster) -> Vec<BasicStatistics> {
 }
 
 fn get_team_pitching_stats(roster: &Roster) {
-    let mut pitcher_stats =
+    // let mut pitcher_stats =
 }
 
 pub(crate) fn display_team_stats(query: &Vec<String>) {

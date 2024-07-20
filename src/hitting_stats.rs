@@ -4,54 +4,25 @@ use term_table::table_cell::TableCell;
 use term_table::row::Row;
 use term_table::{Table};
 use crate::data_id::get_id;
+use crate::stats::Stat;
 
 #[derive(Deserialize)]
-pub(crate) struct BasicStatistics {
-    pub(crate) stats: (Stat,)
+pub(crate) struct BasicHittingStats {
+    pub(crate) stats: (Stat<Batter>,)
 }
 
 #[derive(Deserialize)]
-struct FullStatistics {
-    stats: (Stat, AdvancedStat)
+struct FullHittingStats {
+    stats: (Stat<Batter>, Stat<AdvancedBatter>)
 }
 
 #[derive(Deserialize)]
 struct YearByYearStats {
-    stats: (Stat, Stat, AdvancedStat, AdvancedStat)
+    stats: (Stat<Batter>, Stat<Batter>, Stat<AdvancedBatter>, Stat<AdvancedBatter>)
 }
 
 #[derive(Deserialize)]
-pub(crate) struct Stat {
-    pub(crate) splits: Vec<Split>
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Split {
-    #[serde(default = "default_season")]
-    season: String,
-    pub player: Player,
-    pub(crate) stat: BatterStats
-}
-
-#[derive(Deserialize)]
-struct Player {
-    fullName: String
-}
-
-#[derive(Deserialize)]
-struct AdvancedStat {
-    splits: Vec<AdvancedSplit>
-}
-
-#[derive(Deserialize)]
-struct AdvancedSplit {
-    #[serde(default = "default_season")]
-    season: String,
-    stat: AdvancedBatterStats
-}
-
-#[derive(Deserialize)]
-pub(crate) struct BatterStats {
+pub(crate) struct Batter {
     pub(crate) gamesPlayed: i32,
     runs: i32,
     doubles: i32,
@@ -81,16 +52,12 @@ pub(crate) struct BatterStats {
 }
 
 #[derive(Deserialize)]
-struct AdvancedBatterStats {
+struct AdvancedBatter {
     pitchesPerPlateAppearance: String,
     walksPerPlateAppearance: String,
     strikeoutsPerPlateAppearance: String,
     homeRunsPerPlateAppearance: String,
     walksPerStrikeout: String,
-}
-
-fn default_season() -> String {
-    "Career".to_string()
 }
 
 macro_rules! row {
@@ -103,18 +70,18 @@ macro_rules! row {
     };
 }
 
-fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat>, Vec<AdvancedStat>) {
+fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) {
     if season_type == "yearByYear" {
         let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats=yearByYear,career,yearByYearAdvanced,careerAdvanced&group=hitting", player_id);
         let stats: YearByYearStats = reqwest::blocking::get(url).unwrap().json().unwrap();
         return (vec![stats.stats.0, stats.stats.1], vec![stats.stats.2, stats.stats.3]);
     }
     let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats={},{}Advanced&group=hitting", player_id, season_type, season_type);
-    let stats: FullStatistics = reqwest::blocking::get(url).unwrap().json().unwrap();
+    let stats: FullHittingStats = reqwest::blocking::get(url).unwrap().json().unwrap();
     (vec![stats.stats.0], vec![stats.stats.1])
 }
 
-fn display_stats(stats: (Vec<Stat>, Vec<AdvancedStat>)) {
+fn display_stats(stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>)) {
     let mut table0 = Table::new();
     table0.add_row(row!("Year", "G", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BA", "OBP", "SLG", "OPS", "SO", "BB", "HBP"));
 

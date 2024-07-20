@@ -7,6 +7,7 @@ mod database_generator;
 mod teams;
 mod data_id;
 mod pitching_stats;
+mod stats;
 // #[derive(Debug)]
 // enum PlayerError {
 //     NoPlayer
@@ -30,6 +31,6 @@ mod pitching_stats;
 
 fn main() {
     let query = env::args().collect();
-    teams::display_team_stats(&query);
+    hitting_stats::display_hitting_stats(&query);
     // update_teams().unwrap()
 }
