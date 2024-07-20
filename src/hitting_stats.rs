@@ -2,7 +2,7 @@ use std::fmt::{Display};
 use serde::Deserialize;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;
-use term_table::{Table};
+use term_table::{row, Table};
 use crate::data_id::get_id;
 use crate::stats::Stat;
 
@@ -60,15 +60,15 @@ struct AdvancedBatter {
     walksPerStrikeout: String,
 }
 
-macro_rules! row {
-    ($($cell:expr),*) => {
-        {
-            let mut row = Vec::new();
-            $(row.push(TableCell::new($cell));)*
-            Row::new(row)
-        }
-    };
-}
+// macro_rules! row {
+//     ($($cell:expr),*) => {
+//         {
+//             let mut row = Vec::new();
+//             $(row.push(TableCell::new($cell));)*
+//             Row::new(row)
+//         }
+//     };
+// }
 
 fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) {
     if season_type == "yearByYear" {
@@ -130,6 +130,7 @@ pub(crate) fn display_hitting_stats(query: &Vec<String>) {
         season_type = "season";
     }
     else {
+        // TODO probably not do this check here
         match query[2].to_ascii_lowercase().chars().next().unwrap() {
             'c' => season_type = "career",
             'y' => season_type = "yearByYear",

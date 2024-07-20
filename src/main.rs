@@ -31,6 +31,6 @@ mod stats;
 
 fn main() {
     let query = env::args().collect();
-    hitting_stats::display_hitting_stats(&query);
+    pitching_stats::display_pitching_stats(&query);
     // update_teams().unwrap()
 }
