@@ -28,7 +28,20 @@ mod data_id;
 // }
 
 fn main() {
+    let numbers = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    // Use `iter` to create an iterator that borrows each element
+    let even_numbers: Vec<&i32> = numbers.iter().filter(|&&x| x % 2 == 0).collect();
+
+    // Print the filtered vector of references
+    println!("{:?}", even_numbers);
+
+    // The original vector is still accessible
+    println!("{:?}", numbers);
+    // let v = vec![0, 1, 2, 3];
+    // let w: Vec<i32> = v.into_iter().filter(|num| (*num & 1) == 0).collect();
+    // println!("{:?}", w);
     // let query = env::args().collect();
     // hitting_stats::display_hitting_stats(&query);
-    update_teams().expect("Fail");
+    // update_teams().expect("Fail");
 }

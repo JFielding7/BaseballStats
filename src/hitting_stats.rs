@@ -4,10 +4,14 @@ use term_table::table_cell::TableCell;
 use term_table::row::Row;
 use term_table::{Table};
 use crate::data_id::get_id;
-use crate::data_id;
 
 #[derive(Deserialize)]
-struct Statistics {
+pub(crate) struct BasicStatistics {
+    stats: Stat
+}
+
+#[derive(Deserialize)]
+struct FullStatistics {
     stats: (Stat, AdvancedStat)
 }
 
@@ -106,7 +110,7 @@ fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat>, Vec<Advan
         return (vec![stats.stats.0, stats.stats.1], vec![stats.stats.2, stats.stats.3]);
     }
     let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats={},{}Advanced&group=hitting", player_id, season_type, season_type);
-    let stats: Statistics = reqwest::blocking::get(url).unwrap().json().unwrap();
+    let stats: FullStatistics = reqwest::blocking::get(url).unwrap().json().unwrap();
     (vec![stats.stats.0], vec![stats.stats.1])
 }
 
@@ -165,6 +169,7 @@ pub(crate) fn display_hitting_stats(query: &Vec<String>) {
             _ => season_type = "season"
         }
     }
+
     const ID_LEN: usize = 6;
     let id = get_id("database/player_ids.txt", &query[1], ID_LEN).unwrap();
     if id.is_positive() {
