@@ -7,7 +7,7 @@ use crate::data_id::get_id;
 
 #[derive(Deserialize)]
 pub(crate) struct BasicStatistics {
-    stats: Stat
+    pub(crate) stats: (Stat,)
 }
 
 #[derive(Deserialize)]
@@ -21,16 +21,16 @@ struct YearByYearStats {
 }
 
 #[derive(Deserialize)]
-struct Stat {
-    splits: Vec<Split>
+pub(crate) struct Stat {
+    pub(crate) splits: Vec<Split>
 }
 
 #[derive(Deserialize)]
-struct Split {
+pub(crate) struct Split {
     #[serde(default = "default_season")]
     season: String,
-    stat: BatterStats,
-    player: Player
+    pub player: Player,
+    pub(crate) stat: BatterStats
 }
 
 #[derive(Deserialize)]
@@ -51,8 +51,8 @@ struct AdvancedSplit {
 }
 
 #[derive(Deserialize)]
-struct BatterStats {
-    gamesPlayed: i32,
+pub(crate) struct BatterStats {
+    pub(crate) gamesPlayed: i32,
     runs: i32,
     doubles: i32,
     triples: i32,

@@ -101,7 +101,7 @@ struct Team {
 
 pub(crate) fn update_teams() -> Result<()> {
     let url = "https://statsapi.mlb.com/api/v1/teams?sportId=1";
-    let teams: Teams = get(url).unwrap().json().unwrap();
+    let mut teams: Teams = get(url).unwrap().json().unwrap();
 
     let team_id_file = File::create("database/team_ids.txt")?;
     let mut team_id_writer = LineWriter::new(team_id_file);
@@ -113,6 +113,7 @@ pub(crate) fn update_teams() -> Result<()> {
     for team in &teams.teams {
         max_len = max(max_len, team.fileCode.len());
     }
+    teams.teams.sort_by(|team0, team1| team0.fileCode.cmp(&team1.fileCode));
 
     for team in &teams.teams {
         writeln!(team_id_writer, "{}{}{}", &team.fileCode, " ".repeat(max_len - team.fileCode.len() + 1), team.id)?;
