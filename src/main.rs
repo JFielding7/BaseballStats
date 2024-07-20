@@ -1,5 +1,6 @@
 use std::{env};
 use std::error::Error;
+use crate::database_generator::update_teams;
 
 mod hitting_stats;
 mod database_generator;
@@ -27,6 +28,7 @@ mod teams;
 // }
 
 fn main() {
-    let query = env::args().collect();
-    hitting_stats::display_hitting_stats(query);
+    // let query = env::args().collect();
+    // hitting_stats::display_hitting_stats(query);
+    update_teams().expect("Fail");
 }
