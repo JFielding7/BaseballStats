@@ -1,11 +1,10 @@
-use std::{fmt, io};
 use std::fmt::{Display};
-use std::fs::File;
-use std::io::{BufReader, Error, Read, Result as Res, Seek, SeekFrom};
 use serde::Deserialize;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;
 use term_table::{Table};
+use crate::data_id::get_id;
+use crate::data_id;
 
 #[derive(Deserialize)]
 struct Statistics {
@@ -100,74 +99,6 @@ macro_rules! row {
     };
 }
 
-fn get_line_length(file: &File) -> u64 {
-    let mut reader = BufReader::new(file);
-    let mut buffer = [0; 1];
-
-    let mut i = 1;
-    while reader.read(&mut buffer).is_ok() {
-        let char = buffer[0];
-        if char == b'\n' {
-            return i;
-        }
-        i += 1;
-    }
-    i
-}
-
-fn get_player_id(player: &String) -> Res<i32> {
-    const ID_LENGTH: usize = 6;
-
-    let bytes = player.as_bytes();
-    let mut player_file = File::open("database/player_ids.txt")?;
-    let file_len = player_file.metadata().unwrap().len();
-    let line_len: u64 = get_line_length(&player_file);
-    if player.len() > (line_len as usize) - ID_LENGTH - 2 {
-        return Ok(-1);
-    }
-
-    let mut start = 0;
-    let mut end = file_len;
-    let mut buffer: Box<[u8]> = vec![0; line_len as usize].into_boxed_slice();
-    while start < end {
-        let mid = (start + end >> 1) / line_len * line_len;
-        player_file.seek(SeekFrom::Start(mid))?;
-        player_file.read_exact(&mut buffer)?;
-
-        let mut cmp: i8 = 0;
-        for i in 0..buffer.len() {
-            if buffer[i] == b' ' {
-                if i != bytes.len() {
-                    cmp = 1;
-                }
-                break;
-            }
-            if i == bytes.len() {
-                cmp = -1;
-                break;
-            }
-            cmp = (bytes[i] as i8) - (buffer[i] as i8);
-            if cmp != 0 {
-                break;
-            }
-        }
-
-        if cmp == 0 {
-            player_file.seek(SeekFrom::Start(mid + line_len - (ID_LENGTH as u64) - 1))?;
-            let mut id_buffer: [u8; ID_LENGTH] = [0; ID_LENGTH];
-            player_file.read_exact(&mut id_buffer)?;
-            return Ok(String::from_utf8_lossy(&id_buffer).parse::<i32>().unwrap());
-        }
-        else if cmp > 0 {
-            start = mid + line_len;
-        }
-        else {
-            end = mid;
-        }
-    }
-    Ok(-1)
-}
-
 fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat>, Vec<AdvancedStat>) {
     if season_type == "yearByYear" {
         let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats=yearByYear,career,yearByYearAdvanced,careerAdvanced&group=hitting", player_id);
@@ -219,7 +150,7 @@ fn display_stats(stats: (Vec<Stat>, Vec<AdvancedStat>)) {
     println!("Advanced Batting:\n{}", table1.render());
 }
 
-pub(crate) fn display_hitting_stats(query: Vec<String>) {
+pub(crate) fn display_hitting_stats(query: &Vec<String>) {
     if query.len() == 1 {
         return;
     }
@@ -234,5 +165,12 @@ pub(crate) fn display_hitting_stats(query: Vec<String>) {
             _ => season_type = "season"
         }
     }
-    display_stats(get_hitting_stats(get_player_id(&query[1]).unwrap(), season_type));
+    const ID_LEN: usize = 6;
+    let id = get_id("database/player_ids.txt", &query[1], ID_LEN).unwrap();
+    if id.is_positive() {
+        display_stats(get_hitting_stats(id, season_type));
+    }
+    else {
+        println!("Invalid player!");
+    }
 }

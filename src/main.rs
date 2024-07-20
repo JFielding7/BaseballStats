@@ -5,7 +5,7 @@ use crate::database_generator::update_teams;
 mod hitting_stats;
 mod database_generator;
 mod teams;
-
+mod data_id;
 // #[derive(Debug)]
 // enum PlayerError {
 //     NoPlayer
@@ -29,6 +29,6 @@ mod teams;
 
 fn main() {
     // let query = env::args().collect();
-    // hitting_stats::display_hitting_stats(query);
+    // hitting_stats::display_hitting_stats(&query);
     update_teams().expect("Fail");
 }

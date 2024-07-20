@@ -109,9 +109,14 @@ pub(crate) fn update_teams() -> Result<()> {
     let team_file = File::create("database/teams.txt")?;
     let mut team_writer = LineWriter::new(team_file);
 
+    let mut max_len = 0;
     for team in &teams.teams {
-        writeln!(team_id_writer, "{} {}", team.fileCode, team.id)?;
-        writeln!(team_writer, "{}", team.fileCode)?;
+        max_len = max(max_len, team.fileCode.len());
+    }
+
+    for team in &teams.teams {
+        writeln!(team_id_writer, "{}{}{}", &team.fileCode, " ".repeat(max_len - team.fileCode.len() + 1), team.id)?;
+        writeln!(team_writer, "{}", &team.fileCode)?;
     }
     team_id_writer.flush()?;
     team_writer.flush()?;
