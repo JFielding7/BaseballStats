@@ -6,8 +6,30 @@ use std::io::{BufReader, Read, Result, Seek, SeekFrom};
 use crate::hitting_stats::display_hitting_stats;
 use crate::pitching_stats::display_pitching_stats;
 
+#[derive(Deserialize)]
+pub(crate) struct Stat<T> {
+    pub(crate) splits: Vec<Split<T>>
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Split<T> {
+    #[serde(default = "default_season")]
+    pub(crate) season: String,
+    pub(crate) player: Player,
+    pub(crate) stat: T
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Player {
+    pub(crate) fullName: String
+}
+
+fn default_season() -> String {
+    "Career".to_string()
+}
+
 macro_rules! database_file {
-    () => { "database/player_ids.txt" };
+    () => { "/home/joe/RustroverProjects/mlb/database/player_ids.txt" };
 }
 
 fn get_line_length(file: &File) -> u64 {
@@ -79,28 +101,6 @@ pub(crate) fn get_id(file: &str, key: &String, id_len: usize) -> Result<(i32, bo
         }
     }
     Ok((-1, false))
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Stat<T> {
-    pub(crate) splits: Vec<Split<T>>
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Split<T> {
-    #[serde(default = "default_season")]
-    pub(crate) season: String,
-    pub(crate) player: Player,
-    pub(crate) stat: T
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Player {
-    pub(crate) fullName: String
-}
-
-fn default_season() -> String {
-    "Career".to_string()
 }
 
 pub(crate) fn display_stats(query: &Vec<String>) {
