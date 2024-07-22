@@ -2,7 +2,6 @@ use serde::Deserialize;
 use term_table::{row, Table};
 use term_table::row::Row;
 use term_table::table_cell::TableCell;
-use crate::data_id::get_id;
 use crate::stats::{Stat};
 
 #[derive(Deserialize)]
@@ -30,18 +29,18 @@ pub(crate) struct PitcherStats {
     saveOpportunities: i32
 }
 
-fn get_hitting_stats(player_id: i32, season_type: &String) -> PitchingStats {
-    let season;
-    match &season_type[..] {
-        "c" => season = "career",
-        "y" => season = "yearByYear,career",
-        _ => season = "season"
-    }
-    let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats={}&group=pitching", player_id, season);
+macro_rules! pitching_stats_url {
+    () => { "https://statsapi.mlb.com/api/v1/people/{}/stats?stats={}&group=pitching" };
+}
+
+fn get_pitching_stats(player_id: i32, season_type: &str) -> PitchingStats {
+    let url = format!(pitching_stats_url!(), player_id, season_type);
     reqwest::blocking::get(url).unwrap().json().unwrap()
 }
 
-fn display_stats(stats: PitchingStats) {
+pub(crate) fn display_pitching_stats(player_id: i32, season_type: &str) {
+    let stats: PitchingStats = get_pitching_stats(player_id, season_type);
+
     let mut table = Table::new();
     table.add_row(row!("Year", "W", "L", "W/L", "ERA", "IP", "AVG", "WHIP", "OBP", "SLG", "OPS", "SO/9", "BB/9", "SO/BB", "HR/9", "SV", "SVO"));
 
@@ -58,26 +57,4 @@ fn display_stats(stats: PitchingStats) {
     }
 
     println!("\nPlayer: {}\n\nPitching Statistics:\n{}", &stats.stats[0].splits[0].player.fullName, table.render());
-}
-
-pub(crate) fn display_pitching_stats(query: &Vec<String>) {
-    if query.len() == 1 {
-        return;
-    }
-    let season_type: String;
-    if query.len() > 2 {
-        season_type = query[2].to_lowercase();
-    }
-    else {
-        season_type = "s".to_string();
-    }
-
-    const ID_LEN: usize = 6;
-    let id = get_id("database/player_ids.txt", &query[1], ID_LEN).unwrap();
-    if id.is_positive() {
-        display_stats(get_hitting_stats(id, &season_type));
-    }
-    else {
-        println!("Invalid player!");
-    }
 }

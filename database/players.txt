@@ -119,6 +119,7 @@ blake-snell
 blake-treinen
 blake-walston
 blaze-alexander
+bligh-madris
 bo-bichette
 bo-naylor
 bobby-dalbec
@@ -160,6 +161,7 @@ brian-serven
 brice-turang
 brock-burke
 brock-stewart
+brooks-baldwin
 brooks-lee
 brooks-raley
 bryan-abreu
@@ -238,6 +240,7 @@ christian-vazquez
 christian-walker
 christian-yelich
 christopher-morel
+chuckie-robinson
 cionel-perez
 cj-abrams
 cj-alexander
@@ -351,6 +354,7 @@ duke-ellis
 dylan-carlson
 dylan-cease
 dylan-coleman
+dylan-dodd
 dylan-floro
 dylan-lee
 dylan-moore
@@ -515,6 +519,7 @@ jacob-lopez
 jacob-stallings
 jacob-waguespack
 jacob-webb
+jacob-wilson
 jacob-young
 jahmai-jones
 jair-camargo
@@ -652,6 +657,7 @@ jose-cisnero
 jose-cuas
 jose-e-hernandez
 jose-fermin
+jose-ferrer
 jose-herrera
 jose-iglesias
 jose-leclerc
@@ -1188,6 +1194,7 @@ tyler-soderstrom
 tyler-stephenson
 tyler-wade
 tyler-wells
+tyler-zuber
 tylor-megill
 tyrone-taylor
 tyson-miller

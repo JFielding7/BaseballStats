@@ -5,7 +5,6 @@ use crate::database_generator::update_teams;
 mod hitting_stats;
 mod database_generator;
 mod teams;
-mod data_id;
 mod pitching_stats;
 mod stats;
 // #[derive(Debug)]
@@ -30,7 +29,10 @@ mod stats;
 // }
 
 fn main() {
+    // database_generator::update_players(false).unwrap()
     let query = env::args().collect();
-    pitching_stats::display_pitching_stats(&query);
+    stats::display_stats(&query);
+    // pitching_stats::display_pitching_stats(&query);
+    // hitting_stats::display_hitting_stats(&query);
     // update_teams().unwrap()
 }

@@ -53,7 +53,7 @@ fn get_players(all_time: bool) -> HashMap<String, HashMap<i32, String>> {
 
 pub(crate) fn update_players(all_time: bool) -> Result<()> {
     let baseball_players = get_players(all_time);
-    let mut sorted_players: Vec<(String, &i32)> = Vec::with_capacity(baseball_players.len());
+    let mut sorted_players: Vec<(String, bool, &i32)> = Vec::with_capacity(baseball_players.len());
 
     let mut max_len = 0;
     for (name, players) in &baseball_players {
@@ -61,10 +61,14 @@ pub(crate) fn update_players(all_time: bool) -> Result<()> {
         let is_multiple_players = players.len() > 1;
         for (player_id, position) in players {
             let mut distinct_name;
-            if is_multiple_players { distinct_name = format!("{}-{}-{}", name.clone(), i, position); }
-            else { distinct_name = name.clone(); }
+            if is_multiple_players {
+                distinct_name = format!("{}-{}-{}", name.clone(), i, position);
+            }
+            else {
+                distinct_name = name.clone();
+            }
             max_len = max(max_len, distinct_name.len());
-            sorted_players.push((distinct_name, player_id));
+            sorted_players.push((distinct_name, position == "P", player_id));
             i += 1;
         }
     }
@@ -76,8 +80,8 @@ pub(crate) fn update_players(all_time: bool) -> Result<()> {
     let player_file = File::create("database/players.txt")?;
     let mut player_writer = LineWriter::new(player_file);
 
-    for (name, id) in &sorted_players {
-        writeln!(player_id_writer, "{}{}{}", name, " ".repeat(max_len - name.len() + 1), id)?;
+    for (name, is_pitcher, id) in sorted_players {
+        writeln!(player_id_writer, "{} {}{} {}", name, " ".repeat(max_len - name.len()), is_pitcher as u8, id)?;
         writeln!(player_writer, "{}", name)?;
     }
     player_id_writer.flush()?;

@@ -3,7 +3,6 @@ use serde::Deserialize;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;
 use term_table::{row, Table};
-use crate::data_id::get_id;
 use crate::stats::Stat;
 
 #[derive(Deserialize)]
@@ -60,28 +59,28 @@ struct AdvancedBatter {
     walksPerStrikeout: String,
 }
 
-// macro_rules! row {
-//     ($($cell:expr),*) => {
-//         {
-//             let mut row = Vec::new();
-//             $(row.push(TableCell::new($cell));)*
-//             Row::new(row)
-//         }
-//     };
-// }
+macro_rules! career_years_url {
+    () => { "https://statsapi.mlb.com/api/v1/people/{}/stats?stats=yearByYear,career,yearByYearAdvanced,careerAdvanced&group=hitting" };
+}
+
+macro_rules! single_group_url {
+    () => { "https://statsapi.mlb.com/api/v1/people/{}/stats?stats={},{}Advanced&group=hitting" };
+}
 
 fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) {
     if season_type == "yearByYear" {
-        let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats=yearByYear,career,yearByYearAdvanced,careerAdvanced&group=hitting", player_id);
+        let url = format!(career_years_url!(), player_id);
         let stats: YearByYearStats = reqwest::blocking::get(url).unwrap().json().unwrap();
         return (vec![stats.stats.0, stats.stats.1], vec![stats.stats.2, stats.stats.3]);
     }
-    let url = format!("https://statsapi.mlb.com/api/v1/people/{}/stats?stats={},{}Advanced&group=hitting", player_id, season_type, season_type);
+    let url = format!(single_group_url!(), player_id, season_type, season_type);
     let stats: FullHittingStats = reqwest::blocking::get(url).unwrap().json().unwrap();
     (vec![stats.stats.0], vec![stats.stats.1])
 }
 
-fn display_stats(stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>)) {
+pub(crate) fn display_hitting_stats(player_id: i32, season_type: &str) {
+    let stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) = get_hitting_stats(player_id, season_type);
+
     let mut table0 = Table::new();
     table0.add_row(row!("Year", "G", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BA", "OBP", "SLG", "OPS", "SO", "BB", "HBP"));
 
@@ -119,31 +118,4 @@ fn display_stats(stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>)) {
 
     println!("\nPlayer: {}\n\nStandard Batting:\n{}", &stats.0[0].splits[0].player.fullName, table0.render());
     println!("Advanced Batting:\n{}", table1.render());
-}
-
-pub(crate) fn display_hitting_stats(query: &Vec<String>) {
-    if query.len() == 1 {
-        return;
-    }
-    let season_type: &str;
-    if query.len() == 2 {
-        season_type = "season";
-    }
-    else {
-        // TODO probably not do this check here
-        match query[2].to_ascii_lowercase().chars().next().unwrap() {
-            'c' => season_type = "career",
-            'y' => season_type = "yearByYear",
-            _ => season_type = "season"
-        }
-    }
-
-    const ID_LEN: usize = 6;
-    let id = get_id("database/player_ids.txt", &query[1], ID_LEN).unwrap();
-    if id.is_positive() {
-        display_stats(get_hitting_stats(id, season_type));
-    }
-    else {
-        println!("Invalid player!");
-    }
 }
