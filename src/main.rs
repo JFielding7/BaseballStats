@@ -1,9 +1,9 @@
 use std::{env};
 use std::error::Error;
-use crate::database_generator::update_teams;
+use crate::database::update_teams;
 
 mod hitting_stats;
-mod database_generator;
+mod database;
 mod teams;
 mod pitching_stats;
 mod stats;
@@ -29,6 +29,10 @@ mod stats;
 // }
 
 fn main() {
+    // let sentence = "This     is a sample sentence with whitespace.";
+    // let words: Vec<&str> = sentence.split_whitespace().collect();
+    //
+    // println!("{:?}", words);
     // database_generator::update_players(false).unwrap()
     let query = env::args().collect();
     teams::display_team_stats(&query);

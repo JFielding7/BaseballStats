@@ -1,30 +1,30 @@
-ana 108
-ari 109
-atl 144
-bal 110
-bos 111
-chc 112
-cin 113
-cle 114
-col 115
-cws 145
-det 116
-hou 117
-kc  118
-la  119
-mia 146
-mil 158
-min 142
-nym 121
-nyy 147
-oak 133
-phi 143
-pit 134
-sd  135
-sea 136
-sf  137
-stl 138
-tb  139
-tex 140
-tor 141
-was 120
+ana Los Angeles Angels    108
+ari Arizona Diamondbacks  109
+atl Atlanta Braves        144
+bal Baltimore Orioles     110
+bos Boston Red Sox        111
+chc Chicago Cubs          112
+cin Cincinnati Reds       113
+cle Cleveland Guardians   114
+col Colorado Rockies      115
+cws Chicago White Sox     145
+det Detroit Tigers        116
+hou Houston Astros        117
+kc Kansas City Royals     118
+la Los Angeles Dodgers    119
+mia Miami Marlins         146
+mil Milwaukee Brewers     158
+min Minnesota Twins       142
+nym New York Mets         121
+nyy New York Yankees      147
+oak Oakland Athletics     133
+phi Philadelphia Phillies 143
+pit Pittsburgh Pirates    134
+sd San Diego Padres       135
+sea Seattle Mariners      136
+sf San Francisco Giants   137
+stl St. Louis Cardinals   138
+tb Tampa Bay Rays         139
+tex Texas Rangers         140
+tor Toronto Blue Jays     141
+was Washington Nationals  120

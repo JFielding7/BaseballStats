@@ -99,7 +99,8 @@ struct Teams {
 #[derive(Deserialize)]
 struct Team {
     id: i32,
-    fileCode: String
+    fileCode: String,
+    name: String
 }
 
 
@@ -115,12 +116,12 @@ pub(crate) fn update_teams() -> Result<()> {
 
     let mut max_len = 0;
     for team in &teams.teams {
-        max_len = max(max_len, team.fileCode.len());
+        max_len = max(max_len, team.fileCode.len() + team.name.len());
     }
     teams.teams.sort_by(|team0, team1| team0.fileCode.cmp(&team1.fileCode));
 
     for team in &teams.teams {
-        writeln!(team_id_writer, "{}{}{}", &team.fileCode, " ".repeat(max_len - team.fileCode.len() + 1), team.id)?;
+        writeln!(team_id_writer, "{} {}{} {}", &team.fileCode, &team.name, " ".repeat(max_len - team.fileCode.len() - team.name.len()), team.id)?;
         writeln!(team_writer, "{}", &team.fileCode)?;
     }
     team_id_writer.flush()?;

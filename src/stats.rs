@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use std::env;
+use std::path::PathBuf;
 use std::fmt::{Display};
 use std::fs::File;
 use std::io::{BufReader, Read, Result, Seek, SeekFrom};
@@ -29,7 +31,7 @@ fn default_season() -> String {
 }
 
 macro_rules! database_file {
-    () => { "/home/joe/RustroverProjects/mlb/database/player_ids.txt" };
+    () => { &format!("{}/database/player_ids.txt", env::current_dir().unwrap().display()) };
 }
 
 fn get_line_length(file: &File) -> u64 {
@@ -47,13 +49,13 @@ fn get_line_length(file: &File) -> u64 {
     i
 }
 
-pub(crate) fn get_id(file: &str, key: &String, id_len: usize) -> Result<(i32, bool)> {
+pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Vec<String>> {
     let bytes = key.as_bytes();
     let mut player_file = File::open(file)?;
     let file_len = player_file.metadata().unwrap().len();
     let line_len: u64 = get_line_length(&player_file);
     if key.len() > (line_len as usize) - id_len - 2 {
-        return Ok((-1, false));
+        return Ok(vec![]);
     }
 
     let mut start = 0;
@@ -83,15 +85,16 @@ pub(crate) fn get_id(file: &str, key: &String, id_len: usize) -> Result<(i32, bo
         }
 
         if cmp == 0 {
-            player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 1))?;
-            let mut id_buffer: Box<[u8]>= vec![0; id_len].into_boxed_slice();
-            player_file.read_exact(&mut id_buffer)?;
+            // player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 1))?;
+            // let mut id_buffer: Box<[u8]>= vec![0; id_len].into_boxed_slice();
+            // player_file.read_exact(&mut id_buffer)?;
+            //
+            // player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 3))?;
+            // let mut is_pitcher_buffer: Box<[u8]>= vec![0; 1].into_boxed_slice();
+            // player_file.read_exact(&mut is_pitcher_buffer)?;
 
-            player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 3))?;
-            let mut is_pitcher_buffer: Box<[u8]>= vec![0; 1].into_boxed_slice();
-            player_file.read_exact(&mut is_pitcher_buffer)?;
-
-            return Ok((String::from_utf8_lossy(&id_buffer).parse::<i32>().unwrap(), is_pitcher_buffer[0] != b'0'));
+            // return Ok((String::from_utf8_lossy(&id_buffer).parse::<i32>().unwrap(), is_pitcher_buffer[0] != b'0'));
+            return Ok(std::str::from_utf8(&buffer).unwrap().split_whitespace().map(|token| token.to_string()).collect())
         }
         else if cmp > 0 {
             start = mid + line_len;
@@ -100,7 +103,7 @@ pub(crate) fn get_id(file: &str, key: &String, id_len: usize) -> Result<(i32, bo
             end = mid;
         }
     }
-    Ok((-1, false))
+    Ok(vec![])
 }
 
 pub(crate) fn display_stats(query: &Vec<String>) {
@@ -127,8 +130,10 @@ pub(crate) fn display_stats(query: &Vec<String>) {
         return;
     }
 
-    let (id, is_pitcher) = get_id(database_file!(), &query[PLAYER_INDEX], ID_LEN).unwrap();
-    if id.is_positive() {
+    let entry= get_entry(database_file!(), &query[PLAYER_INDEX], ID_LEN).unwrap();
+    if entry.len() > 0 {
+        let id = entry[2].parse::<i32>().unwrap();
+        let is_pitcher = entry[1].as_bytes()[0] != b'0';
         if is_pitcher {
             display_pitching_stats(id, season_type);
         }

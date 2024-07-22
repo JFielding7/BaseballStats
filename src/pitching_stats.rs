@@ -11,11 +11,11 @@ pub(crate) struct PitchingStats {
 
 #[derive(Deserialize)]
 pub(crate) struct PitcherStats {
+    pub(crate) inningsPitched: String,
     wins: i32,
     losses: i32,
     winPercentage: String,
     era: String,
-    inningsPitched: String,
     avg: String,
     whip: String,
     obp: String,
@@ -33,7 +33,7 @@ macro_rules! pitching_stats_url {
     () => { "https://statsapi.mlb.com/api/v1/people/{}/stats?stats={}&group=pitching" };
 }
 
-fn get_pitching_stats(player_id: i32, season_type: &str) -> PitchingStats {
+pub(crate) fn get_pitching_stats(player_id: i32, season_type: &str) -> PitchingStats {
     let url = format!(pitching_stats_url!(), player_id, season_type);
     reqwest::blocking::get(url).unwrap().json().unwrap()
 }
