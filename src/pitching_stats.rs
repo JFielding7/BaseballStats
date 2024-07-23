@@ -2,7 +2,7 @@ use serde::Deserialize;
 use term_table::{row, Table};
 use term_table::row::Row;
 use term_table::table_cell::TableCell;
-use crate::stats::{Split, Stat};
+use crate::stats::{Stat};
 
 #[derive(Deserialize)]
 pub(crate) struct PitchingStats {
@@ -35,7 +35,7 @@ macro_rules! pitching_stats_url {
 
 macro_rules! pitching_header {
     ($col0:expr) => {
-        row!($col0, "W", "L", "W/L", "ERA", "IP", "AVG", "WHIP", "OBP", "SLG", "OPS", "SO/9", "BB/9", "SO/BB", "HR/9", "SV", "SVO")
+        row!($col0, "W", "L", "PCT", "ERA", "IP", "AVG", "WHIP", "OBP", "SLG", "OPS", "SO/9", "BB/9", "SO/BB", "HR/9", "SV", "SVO")
     };
 }
 pub(crate) use pitching_header;
