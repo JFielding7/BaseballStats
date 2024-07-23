@@ -99,8 +99,7 @@ macro_rules! basic_hitting_row {
 
 pub(crate) fn get_basic_hitting_row(stats: &BasicHittingStats) -> Row {
     let split = &stats.stats.0.splits[0];
-    let stat_group = &split.stat;
-    basic_hitting_row!(&stats.stats.0.splits[0].player.fullName, split, stat_group)
+    basic_hitting_row!(&split.player.fullName, split, &split.stat)
 }
 
 fn advanced_hitting_row(advanced_split: &Split<AdvancedBatter>, stat_group: &Batter, advanced_stat_group: &AdvancedBatter) -> Row {
