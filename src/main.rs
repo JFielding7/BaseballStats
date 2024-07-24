@@ -9,36 +9,29 @@ mod teams;
 mod pitching_stats;
 mod stats;
 mod standings;
-// #[derive(Debug)]
-// enum PlayerError {
-//     NoPlayer
-// }
+mod game;
+
+use figlet_rs::FIGfont;
+use crate::game::display_game_stats;
+// fn main() {
+//     let small_font = FIGfont::standard().unwrap();
+//     let figure0 = small_font.convert("PHI 11 - 0 MIN").unwrap();
+//     let figure1 = small_font.convert("MIN 0").unwrap();
 //
-// impl Error for PlayerError {}
-//
-// impl Display for PlayerError {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         let m = "hello";
-//         write!(f, "Incorrect {m}")
-//     }
-// }
-//
-// fn f(a: i32) -> Result<i32, PlayerError> {
-//     if a == 0 {
-//         return Err(PlayerError::NoPlayer);
-//     }
-//     Ok(a)
+//     println!("{}", figure0);
+//     println!("{}", figure1);
 // }
 
 fn main() {
+    display_game_stats(745878);
     // display_standings().expect("Fail");
     // let sentence = "This     is a sample sentence with whitespace.";
     // let words: Vec<&str> = sentence.split_whitespace().collect();
     //
     // println!("{:?}", words);
     // database_generator::update_players(false).unwrap()
-    let query = env::args().collect();
-    teams::display_team_stats(&query);
+    // let query = env::args().collect();
+    // teams::display_team_stats(&query);
     // stats::display_stats(&query);
     // pitching_stats::display_pitching_stats(&query);
     // hitting_stats::display_hitting_stats(&query);
