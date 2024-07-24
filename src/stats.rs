@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
 use std::env;
-use std::path::PathBuf;
 use std::fmt::{Display};
 use std::fs::File;
 use std::io::{BufReader, Read, Result, Seek, SeekFrom};
@@ -17,6 +16,7 @@ pub(crate) struct Stat<T> {
 pub(crate) struct Split<T> {
     #[serde(default = "default_season")]
     pub(crate) season: String,
+    #[serde(default = "no_name")]
     pub(crate) player: Player,
     pub(crate) stat: T
 }
@@ -28,6 +28,10 @@ pub(crate) struct Player {
 
 fn default_season() -> String {
     "Career".to_string()
+}
+
+fn no_name() -> Player {
+    Player { fullName: "".to_string() }
 }
 
 macro_rules! database_file {
@@ -85,15 +89,6 @@ pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Ve
         }
 
         if cmp == 0 {
-            // player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 1))?;
-            // let mut id_buffer: Box<[u8]>= vec![0; id_len].into_boxed_slice();
-            // player_file.read_exact(&mut id_buffer)?;
-            //
-            // player_file.seek(SeekFrom::Start(mid + line_len - (id_len as u64) - 3))?;
-            // let mut is_pitcher_buffer: Box<[u8]>= vec![0; 1].into_boxed_slice();
-            // player_file.read_exact(&mut is_pitcher_buffer)?;
-
-            // return Ok((String::from_utf8_lossy(&id_buffer).parse::<i32>().unwrap(), is_pitcher_buffer[0] != b'0'));
             return Ok(std::str::from_utf8(&buffer).unwrap().split_whitespace().map(|token| token.to_string()).collect())
         }
         else if cmp > 0 {

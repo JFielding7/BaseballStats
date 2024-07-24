@@ -24,31 +24,31 @@ struct YearByYearStats {
 #[derive(Deserialize)]
 pub(crate) struct Batter {
     pub(crate) plateAppearances: i32,
-    gamesPlayed: i32,
-    runs: i32,
-    doubles: i32,
-    triples: i32,
-    homeRuns: i32,
-    strikeOuts: i32,
-    baseOnBalls: i32,
-    intentionalWalks: i32,
-    hits: i32,
-    hitByPitch: i32,
-    avg: String,
-    atBats: i32,
-    obp: String,
-    slg: String,
-    ops: String,
-    caughtStealing: i32,
-    stolenBases: i32,
-    stolenBasePercentage: String,
-    groundIntoDoublePlay: i32,
-    totalBases: i32,
-    rbi: i32,
-    leftOnBase: i32,
-    sacBunts: i32,
-    sacFlies: i32,
-    atBatsPerHomeRun: String
+    pub(crate) gamesPlayed: i32,
+    pub(crate) runs: i32,
+    pub(crate) doubles: i32,
+    pub(crate) triples: i32,
+    pub(crate) homeRuns: i32,
+    pub(crate) strikeOuts: i32,
+    pub(crate) baseOnBalls: i32,
+    pub(crate) intentionalWalks: i32,
+    pub(crate) hits: i32,
+    pub(crate) hitByPitch: i32,
+    pub(crate) avg: String,
+    pub(crate) atBats: i32,
+    pub(crate) obp: String,
+    pub(crate) slg: String,
+    pub(crate) ops: String,
+    pub(crate) caughtStealing: i32,
+    pub(crate) stolenBases: i32,
+    pub(crate) stolenBasePercentage: String,
+    pub(crate) groundIntoDoublePlay: i32,
+    pub(crate) totalBases: i32,
+    pub(crate) rbi: i32,
+    pub(crate) leftOnBase: i32,
+    pub(crate) sacBunts: i32,
+    pub(crate) sacFlies: i32,
+    pub(crate) atBatsPerHomeRun: String
 }
 
 #[derive(Deserialize)]
@@ -86,7 +86,7 @@ macro_rules! advanced_hitting_header {
 }
 
 macro_rules! basic_hitting_row {
-    ($col0:expr, $split:expr, $stat_group:expr) => {
+    ($col0:expr, $stat_group:expr) => {
         row!(
             $col0, $stat_group.gamesPlayed, $stat_group.plateAppearances,
             $stat_group.atBats, $stat_group.runs, $stat_group.hits, $stat_group.doubles,
@@ -96,10 +96,11 @@ macro_rules! basic_hitting_row {
         )
     };
 }
+pub(crate) use basic_hitting_row;
 
 pub(crate) fn get_basic_hitting_row(stats: &BasicHittingStats) -> Row {
     let split = &stats.stats.0.splits[0];
-    basic_hitting_row!(&split.player.fullName, split, &split.stat)
+    basic_hitting_row!(&split.player.fullName, &split.stat)
 }
 
 fn advanced_hitting_row(advanced_split: &Split<AdvancedBatter>, stat_group: &Batter, advanced_stat_group: &AdvancedBatter) -> Row {
@@ -147,7 +148,7 @@ pub(crate) fn display_hitting_stats(player_id: i32, season_type: &str) {
         for j in 0..reg_splits.len() {
             let split = &reg_splits[j];
             let stat_group = &split.stat;
-            table0.add_row(basic_hitting_row!(&split.season, split, stat_group));
+            table0.add_row(basic_hitting_row!(&split.season, stat_group));
 
             let advanced_split = &advanced_splits[j];
             let advanced_stat_group = &advanced_split.stat;

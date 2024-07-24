@@ -31,14 +31,14 @@ mod standings;
 // }
 
 fn main() {
-    display_standings().expect("Fail");
+    // display_standings().expect("Fail");
     // let sentence = "This     is a sample sentence with whitespace.";
     // let words: Vec<&str> = sentence.split_whitespace().collect();
     //
     // println!("{:?}", words);
     // database_generator::update_players(false).unwrap()
-    // let query = env::args().collect();
-    // teams::display_team_stats(&query);
+    let query = env::args().collect();
+    teams::display_team_stats(&query);
     // stats::display_stats(&query);
     // pitching_stats::display_pitching_stats(&query);
     // hitting_stats::display_hitting_stats(&query);

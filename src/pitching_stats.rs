@@ -6,27 +6,27 @@ use crate::stats::{Stat};
 
 #[derive(Deserialize)]
 pub(crate) struct PitchingStats {
-    pub(crate) stats: Vec<Stat<PitcherStats>>
+    pub(crate) stats: Vec<Stat<Pitcher>>
 }
 
 #[derive(Deserialize)]
-pub(crate) struct PitcherStats {
+pub(crate) struct Pitcher {
     pub(crate) inningsPitched: String,
-    wins: i32,
-    losses: i32,
-    winPercentage: String,
-    era: String,
-    avg: String,
-    whip: String,
-    obp: String,
-    slg: String,
-    ops: String,
-    strikeoutsPer9Inn: String,
-    walksPer9Inn: String,
-    strikeoutWalkRatio: String,
-    homeRunsPer9: String,
-    saves: i32,
-    saveOpportunities: i32
+    pub(crate) wins: i32,
+    pub(crate) losses: i32,
+    pub(crate) winPercentage: String,
+    pub(crate) era: String,
+    pub(crate) avg: String,
+    pub(crate) whip: String,
+    pub(crate) obp: String,
+    pub(crate) slg: String,
+    pub(crate) ops: String,
+    pub(crate) strikeoutsPer9Inn: String,
+    pub(crate) walksPer9Inn: String,
+    pub(crate) strikeoutWalkRatio: String,
+    pub(crate) homeRunsPer9: String,
+    pub(crate) saves: i32,
+    pub(crate) saveOpportunities: i32
 }
 
 macro_rules! pitching_stats_url {
@@ -51,6 +51,7 @@ macro_rules! pitching_row {
         )
     };
 }
+pub(crate) use pitching_row;
 
 pub(crate) fn get_season_pitching_stats(player_id: i32) -> reqwest::Result<PitchingStats> {
     reqwest::blocking::get(format!(pitching_stats_url!(), player_id, "season")).unwrap().json()

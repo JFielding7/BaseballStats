@@ -6,9 +6,9 @@ use reqwest::blocking::get;
 use term_table::{row, Table};
 use term_table::row::Row;
 use term_table::table_cell::TableCell;
-use crate::stats::get_entry;
-use crate::hitting_stats::{get_basic_season_hitting_stats, get_basic_hitting_row, BasicHittingStats, basic_hitting_header};
-use crate::pitching_stats::{get_season_pitching_stats, get_pitching_row, PitchingStats, pitching_header};
+use crate::stats::{get_entry, Stat};
+use crate::hitting_stats::{get_basic_season_hitting_stats, get_basic_hitting_row, BasicHittingStats, basic_hitting_header, Batter, basic_hitting_row};
+use crate::pitching_stats::{get_season_pitching_stats, get_pitching_row, PitchingStats, pitching_header, Pitcher, pitching_row};
 
 #[derive(Deserialize)]
 struct Roster {
@@ -30,6 +30,11 @@ struct Person {
 #[derive(Deserialize)]
 struct Position {
     abbreviation: String
+}
+
+#[derive(Deserialize)]
+struct TeamStats {
+    stats: (Stat<Batter>, Stat<Pitcher>)
 }
 
 const PITCHER: &str = "P";
@@ -72,23 +77,31 @@ fn pitcher_comparator(player0: &PitchingStats, player1: &PitchingStats) -> Order
         .partial_cmp(&player0.stats[0].splits[0].stat.inningsPitched.parse::<f32>().unwrap()).unwrap()
 }
 
-fn get_team_stats(team_id: i32) -> (Vec<Player>, Vec<Player>) {
+fn get_team_roster(team_id: i32) -> (Vec<Player>, Vec<Player>) {
     let roster: Roster = get(format!(roster_url!(), team_id)).unwrap().json().unwrap();
     roster.roster.into_iter().partition(|player| player.position.abbreviation == PITCHER)
 }
 
+fn get_total_team_stats(team_id: i32) -> TeamStats {
+    get(format!("https://statsapi.mlb.com/api/v1/teams/{}/stats?group=pitching,hitting&stats=season", team_id)).unwrap().json().unwrap()
+}
+
 pub(crate) fn print_team_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) {
-    let (pitchers, hitters) = get_team_stats(team_id);
+    let (pitchers, hitters) = get_team_roster(team_id);
+    let team_stats = get_total_team_stats(team_id);
 
     if display_hitting {
-        let stat_table: Table = stat_table!(BasicHittingStats, basic_hitting_header, hitters,
+        let mut stat_table: Table = stat_table!(BasicHittingStats, basic_hitting_header, hitters,
             get_basic_season_hitting_stats, get_basic_hitting_row, hitter_comparator);
+        let split = &team_stats.stats.0.splits[0];
+        stat_table.add_row(basic_hitting_row!("Team", &split.stat));
         println!("\n{}Hitting Stats\n\n{}", team_name, stat_table.render());
     }
 
     if display_pitching {
-        let stat_table: Table = stat_table!(PitchingStats, pitching_header, pitchers,
+        let mut stat_table: Table = stat_table!(PitchingStats, pitching_header, pitchers,
             get_season_pitching_stats, get_pitching_row, pitcher_comparator);
+        stat_table.add_row(pitching_row!("Team", &team_stats.stats.1.splits[0].stat));
         println!("\n{}Pitching Stats\n\n{}", team_name, stat_table.render());
     }
 }
