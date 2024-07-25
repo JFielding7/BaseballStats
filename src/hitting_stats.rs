@@ -24,6 +24,7 @@ struct YearByYearStats {
 #[derive(Deserialize)]
 pub(crate) struct Batter {
     pub(crate) plateAppearances: i32,
+    #[serde(default)]
     pub(crate) gamesPlayed: i32,
     pub(crate) runs: i32,
     pub(crate) doubles: i32,

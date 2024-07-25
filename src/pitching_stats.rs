@@ -12,12 +12,19 @@ pub(crate) struct PitchingStats {
 #[derive(Deserialize)]
 pub(crate) struct Pitcher {
     pub(crate) inningsPitched: String,
+    #[serde(default)]
     pub(crate) hits: i32,
+    #[serde(default)]
     pub(crate) earnedRuns: i32,
+    #[serde(default)]
     pub(crate) baseOnBalls: i32,
+    #[serde(default)]
     pub(crate) strikeOuts: i32,
+    #[serde(default)]
     pub(crate) hitByPitch: i32,
+    #[serde(default)]
     pub(crate) wins: i32,
+    #[serde(default)]
     pub(crate) losses: i32,
     #[serde(default)]
     pub(crate) winPercentage: String,
@@ -39,8 +46,11 @@ pub(crate) struct Pitcher {
     pub(crate) walksPer9Inn: String,
     #[serde(default)]
     pub(crate) strikeoutWalkRatio: String,
+    #[serde(default)]
     pub(crate) homeRunsPer9: String,
+    #[serde(default)]
     pub(crate) saves: i32,
+    #[serde(default)]
     pub(crate) saveOpportunities: i32
 }
 

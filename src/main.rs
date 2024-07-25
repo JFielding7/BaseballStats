@@ -23,7 +23,7 @@ use crate::game::display_game_stats;
 // }
 
 fn main() {
-    display_game_stats(745878);
+    display_game_stats(745877);
     // display_standings().expect("Fail");
     // let sentence = "This     is a sample sentence with whitespace.";
     // let words: Vec<&str> = sentence.split_whitespace().collect();
