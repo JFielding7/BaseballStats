@@ -34,10 +34,14 @@ pub(crate) struct Batter {
     pub(crate) intentionalWalks: i32,
     pub(crate) hits: i32,
     pub(crate) hitByPitch: i32,
+    #[serde(default)]
     pub(crate) avg: String,
     pub(crate) atBats: i32,
+    #[serde(default)]
     pub(crate) obp: String,
+    #[serde(default)]
     pub(crate) slg: String,
+    #[serde(default)]
     pub(crate) ops: String,
     pub(crate) caughtStealing: i32,
     pub(crate) stolenBases: i32,
