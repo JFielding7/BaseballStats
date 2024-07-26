@@ -12,7 +12,7 @@ mod standings;
 mod game;
 
 use figlet_rs::FIGfont;
-use crate::game::display_game_stats;
+use crate::game::{display_game_stats, display_games_today};
 // fn main() {
 //     let small_font = FIGfont::standard().unwrap();
 //     let figure0 = small_font.convert("PHI 11 - 0 MIN").unwrap();
@@ -23,17 +23,12 @@ use crate::game::display_game_stats;
 // }
 
 fn main() {
-    display_game_stats(745877);
-    // display_standings().expect("Fail");
-    // let sentence = "This     is a sample sentence with whitespace.";
-    // let words: Vec<&str> = sentence.split_whitespace().collect();
-    //
-    // println!("{:?}", words);
-    // database_generator::update_players(false).unwrap()
-    // let query = env::args().collect();
-    // teams::display_team_stats(&query);
-    // stats::display_stats(&query);
-    // pitching_stats::display_pitching_stats(&query);
-    // hitting_stats::display_hitting_stats(&query);
-    // update_teams().unwrap()
+    display_games_today()
+    display_game_stats(10052);
+    display_standings().expect("Fail");
+    let query = env::args().collect();
+    teams::display_team_stats(&query);
+    stats::display_stats(&query);
+    pitching_stats::display_pitching_stats(&query);
+    hitting_stats::display_hitting_stats(&query);
 }

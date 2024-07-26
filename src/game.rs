@@ -1,3 +1,4 @@
+use std::cmp::max;
 use figlet_rs::FIGfont;
 use std::collections::HashMap;
 use serde::Deserialize;
@@ -7,7 +8,42 @@ use term_table::row::Row;
 use term_table::table_cell::TableCell;
 use crate::hitting_stats::{Batter};
 use crate::pitching_stats::{Pitcher};
-use crate::stats;
+use crate::{database, stats};
+
+#[derive(Deserialize)]
+struct Schedule {
+    dates: Vec<Date>
+}
+
+#[derive(Deserialize)]
+struct Date {
+    games: Vec<Game>
+}
+
+#[derive(Deserialize)]
+struct Game {
+    gamePk: i32,
+    teams: PlayingTeams,
+    status: Status
+}
+
+#[derive(Deserialize)]
+struct PlayingTeams {
+    away: PlayingTeam,
+    home: PlayingTeam
+}
+
+#[derive(Deserialize)]
+struct PlayingTeam {
+    leagueRecord: Record,
+    score: i32,
+    team: database::Team
+}
+
+#[derive(Deserialize)]
+struct Status {
+    abstractGameState: String
+}
 
 #[derive(Deserialize)]
 struct LineScore {
@@ -76,7 +112,7 @@ struct TeamInfo {
 #[derive(Deserialize)]
 struct Record {
     wins: i32,
-    losses: i32
+    losses: i32,
 }
 
 #[derive(Deserialize)]
@@ -90,6 +126,10 @@ struct Stats {
 fn deserialize_stats<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
 where T: serde::Deserialize<'de>, D: serde::Deserializer<'de> {
     Ok(Option::<T>::deserialize(deserializer).unwrap_or(None))
+}
+
+macro_rules! games_today_url {
+    () => { "https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1" };
 }
 
 macro_rules! box_score_url {
@@ -268,4 +308,42 @@ pub(crate) fn display_game_stats(game_id: i32) {
     display_team_stats(away_team, &away_hitters, &away_pitchers);
     println!("{}", "-".repeat(DIVIDER_LEN));
     display_team_stats(home_team, &home_hitters, &home_pitchers);
+}
+
+const STATES: [&str; 4] = ["Final", "Live", "Preview", "Other"];
+macro_rules! state_index {
+    ($game:expr) => {
+        STATES.iter().position(|&curr| curr == $game.status.abstractGameState).unwrap()
+    };
+}
+
+macro_rules! update_max {
+    ($team:expr, $max:expr) => {
+        let record = &$team.leagueRecord;
+        $max = max($max, $team.team.name.len() +
+            record.wins.to_string().len() +
+            record.losses.to_string().len()
+        )
+    };
+}
+
+pub(crate) fn display_games_today() {
+    let schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
+    let mut games = &schedule.dates[0].games;
+    games.sort_by(|game0, game1| state_index!(game0).cmp(&state_index!(game1)));
+
+    let mut max_away_len = 0;
+    let mut max_home_len = 0;
+    for game in games {
+        update_max!(&game.teams.away, max_away_len);
+        update_max!(&game.teams.home, max_home_len);
+    }
+
+    for game in games {
+        let away_team = &game.teams.away;
+        let home_team = &game.teams.home;
+
+        // print!("{} ({}-{}){}{} - ", away_team.team.name, away_team.leagueRecord.wins, away_team.leagueRecord.losses, away_team.score);
+        // println!("{} {} ({}-{})    ({})", home_team.score, home_team.team.name, home_team.leagueRecord.wins, home_team.leagueRecord.losses, game.status.abstractGameState);
+    }
 }
