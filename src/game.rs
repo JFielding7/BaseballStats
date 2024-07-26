@@ -68,7 +68,6 @@ struct DateTime {
 #[derive(Deserialize)]
 struct LiveData {
     linescore: LineScore,
-    // boxscore: BoxScore
 }
 
 #[derive(Deserialize)]
@@ -145,7 +144,6 @@ struct Record {
     losses: i32,
 }
 
-
 #[derive(Deserialize)]
 struct Stats {
     #[serde(deserialize_with = "deserialize_stats")]
@@ -157,14 +155,6 @@ struct Stats {
 fn deserialize_stats<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
 where T: serde::Deserialize<'de>, D: serde::Deserializer<'de> {
     Ok(Option::<T>::deserialize(deserializer).unwrap_or(None))
-}
-
-const STATES: [&str; 4] = ["Final", "Live", "Preview", "Other"];
-
-macro_rules! state_index {
-    ($game:expr) => {
-        STATES.iter().position(|&curr| curr == $game.status.abstractGameState).unwrap()
-    };
 }
 
 macro_rules! update_line_offset {
@@ -269,6 +259,28 @@ macro_rules! display_record {
     }};
 }
 
+fn get_game_state(feed: &Feed) -> String {
+    match feed.gameData.status.abstractGameState.as_str() {
+        "Final" => "Final".to_string(),
+        "Live" => {
+            let line_score = &feed.liveData.linescore;
+            format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
+        },
+        "Preview" => {
+            const EST_OFFSET: i32 = 19;
+            const HOURS: i32 = 12;
+
+            let date_time = &feed.gameData.datetime;
+            let hour_index = date_time.dateTime.find(":").unwrap();
+            let hour = (date_time.dateTime[hour_index - 2..hour_index]
+                .parse::<i32>().unwrap() + EST_OFFSET) % HOURS + 1;
+            let minutes = &date_time.time[date_time.time.find(":").unwrap()..];
+            format!("{}{} {}", hour, minutes, date_time.ampm)
+        },
+        _ => "".to_string()
+    }
+}
+
 fn display_team_stats(team: &Team, hitters: &Vec<&Player>, pitchers: &Vec<&Player>) {
     println!("{} Stats\n\nBatting", &team.team.name);
     display_stat_table!(team.teamStats.batting.as_ref().unwrap(), hitters, batting, hitting_header, hitting_row);
@@ -279,10 +291,12 @@ fn display_team_stats(team: &Team, hitters: &Vec<&Player>, pitchers: &Vec<&Playe
 
 fn hitters_and_pitchers(team: &Team) -> (Vec<&Player>, Vec<&Player>) {
     let mut players: Vec<&Player> = team.players.values().collect();
-    let (mut hitters, mut pitchers): (Vec<&Player>, Vec<&Player>) = players.iter().partition(|&&player| player.stats.batting.is_some());
+    let (mut hitters, mut pitchers): (Vec<&Player>, Vec<&Player>) = players
+        .iter().partition(|&&player| player.stats.batting.is_some());
     hitters.sort_by(|&player0, &player1| player0.battingOrder.cmp(&player1.battingOrder));
 
-    let mut pitchers: Vec<&Player> = pitchers.into_iter().filter(|&player| player.stats.pitching.is_some()).collect();
+    let mut pitchers: Vec<&Player> = pitchers.
+        into_iter().filter(|&player| player.stats.pitching.is_some()).collect();
     pitchers.sort_by(|&player0, &player1| {
         player1.stats.pitching.as_ref().unwrap().inningsPitched
             .cmp(&player0.stats.pitching.as_ref().unwrap().inningsPitched)
@@ -298,15 +312,6 @@ fn display_winning_and_losing_pitchers(away_pitchers: &Vec<&Player>, home_pitche
     winning_losing_pitchers!(home_pitchers, winning_pitcher, losing_pitcher);
 
     println!("\nWinning Pitcher: {}\nLosing Pitcher: {}\n", winning_pitcher, losing_pitcher);
-}
-
-fn get_live_inning(game_id: i32, line_score: &LineScore) -> String {
-    println!("hello");
-    let state: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
-    match state.gameData.status.abstractGameState.as_str() {
-        "Live" => format!("{} {}\n", line_score.inningState, line_score.currentInningOrdinal),
-        _ => "".to_string()
-    }
 }
 
 fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, home_team: &Team) {
@@ -353,7 +358,7 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
     innings.add_row(Row::new(away_scores));
     innings.add_row(Row::new(home_scores));
 
-    println!("{}{}", get_live_inning(game_id, line_score), innings.render());
+    println!("{}{}", get_game_state(get(game_feed_url!(game_id)).unwrap().json().unwrap()), innings.render());
 }
 
 pub(crate) fn display_game_stats(game_id: i32) {
@@ -376,27 +381,6 @@ pub(crate) fn display_game_stats(game_id: i32) {
     display_team_stats(away_team, &away_hitters, &away_pitchers);
     println!("{}", "-".repeat(DIVIDER_LEN));
     display_team_stats(home_team, &home_hitters, &home_pitchers);
-}
-
-fn format_game_state(game: &Game, feed: &Feed) -> String {
-    match game.status.abstractGameState.as_str() {
-        "Final" => "Final".to_string(),
-        "Live" => {
-            let line_score = &feed.liveData.linescore;
-            format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
-        },
-        "Preview" => {
-            const EST_OFFSET: i32 = 19;
-            const HOURS: i32 = 12;
-
-            let date_time = &feed.gameData.datetime;
-            let hour_index = date_time.dateTime.find(":").unwrap();
-            let hour = (date_time.dateTime[hour_index - 2..hour_index].parse::<i32>().unwrap() + EST_OFFSET) % HOURS + 1;
-            let minutes = &date_time.time[date_time.time.find(":").unwrap()..];
-            format!("{}{} {}", hour, minutes, date_time.ampm)
-        },
-        _ => "".to_string()
-    }
 }
 
 pub(crate) fn display_games_today() {
@@ -428,7 +412,7 @@ pub(crate) fn display_games_today() {
             );
             println!(
                 "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, format_game_state(game, &feed)
+                home_team.team.name, home_record.wins, home_record.losses, get_game_state(&feed)
             );
         }
         else {
@@ -438,7 +422,7 @@ pub(crate) fn display_games_today() {
             );
             println!(
                 "   {} {} ({}-{})    {}", " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, format_game_state(game, &feed)
+                home_team.team.name, home_record.wins, home_record.losses, get_game_state(&feed)
             );
         }
     }
