@@ -43,7 +43,8 @@ struct PlayingTeam {
 
 #[derive(Deserialize)]
 struct Status {
-    abstractGameState: String
+    abstractGameState: String,
+    detailedState: String
 }
 
 #[derive(Deserialize)]
@@ -182,6 +183,12 @@ macro_rules! game_feed_url {
     ($game_id:expr) => { format!("https://statsapi.mlb.com/api/v1.1/game/{}/feed/live", $game_id) };
 }
 
+macro_rules! season_games_url {
+    ($team_id:expr, $season:expr) => {
+        format!("https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={}&gameType=R&season={}", $team_id, $season)
+    };
+}
+
 macro_rules! hitting_header {
     () => { row!("Player", "PA", "AB", "R", "H", "2B", "3B", "HR", "RBI", "SO", "BB", "HBP", "LOB", "AVG", "OBP", "SLG", "OPS") };
 }
@@ -259,7 +266,12 @@ macro_rules! display_record {
     }};
 }
 
-fn get_game_state(feed: &Feed) -> String {
+fn get_game_state(feed_option: Option<Feed>) -> String {
+    if feed_option.is_none() {
+        return "Final".to_string();
+    }
+
+    let feed = feed_option.unwrap();
     match feed.gameData.status.abstractGameState.as_str() {
         "Final" => "Final".to_string(),
         "Live" => {
@@ -358,7 +370,55 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
     innings.add_row(Row::new(away_scores));
     innings.add_row(Row::new(home_scores));
 
-    println!("{}{}", get_game_state(get(game_feed_url!(game_id)).unwrap().json().unwrap()), innings.render());
+    let feed: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
+    println!("{}\n{}", get_game_state(Option::from(feed)), innings.render());
+}
+
+fn display_games(games: &Vec<Game>, fetch_feed: bool) {
+    let mut max_offset = 0;
+    let game_line_offsets: Vec<(&Game, Option<Feed>, usize, usize)> = games.iter().map(|game| {
+        let mut feed_option = None;
+        if fetch_feed {
+            let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
+            feed_option = Option::from(feed);
+        }
+
+        let teams = &game.teams;
+        let away_offset = update_line_offset!(teams.away, max_offset);
+        let home_offset = update_line_offset!(teams.home, max_offset);
+        (game, feed_option, away_offset, home_offset)
+    }).collect();
+
+    for (game, feed, away_offset, home_offset) in game_line_offsets {
+        let teams = &game.teams;
+
+        let away_team = &teams.away;
+        let away_record = &away_team.leagueRecord;
+        let home_team = &teams.home;
+        let home_record = &home_team.leagueRecord;
+        let game_state = &game.status.abstractGameState;
+
+        if game_state == "Final" || game_state == "Live" {
+            print!(
+                "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
+                " ".repeat(max_offset - away_offset), away_team.score
+            );
+            println!(
+                "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
+                home_team.team.name, home_record.wins, home_record.losses, get_game_state(feed)
+            );
+        }
+        else {
+            print!(
+                "{} ({}-{}) {}      ", away_team.team.name, away_record.wins, away_record.losses,
+                " ".repeat(max_offset - away_offset)
+            );
+            println!(
+                "   {} {} ({}-{})    {}", " ".repeat(max_offset - home_offset),
+                home_team.team.name, home_record.wins, home_record.losses, get_game_state(feed)
+            );
+        }
+    }
 }
 
 pub(crate) fn display_game_stats(game_id: i32) {
@@ -385,45 +445,23 @@ pub(crate) fn display_game_stats(game_id: i32) {
 
 pub(crate) fn display_games_today() {
     let mut schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
-    let mut games: &mut Vec<Game> = &mut schedule.dates[0].games;
+    display_games(&mut schedule.dates[0].games, true);
+}
 
-    let mut max_offset = 0;
-    let game_line_offsets: Vec<(&Game, Feed, usize, usize)> = games.iter().map(|game| {
-        let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
-        let teams = &game.teams;
-        let away_offset = update_line_offset!(teams.away, max_offset);
-        let home_offset = update_line_offset!(teams.home, max_offset);
-        (game, feed, away_offset, home_offset)
-    }).collect();
+pub(crate) fn display_completed_games(team_id: i32, season: i32, n_games: usize) {
+    let schedule: Schedule = get(season_games_url!(team_id, season)).unwrap().json().unwrap();
 
-    for (game, feed, away_offset, home_offset) in game_line_offsets {
-        let teams = &game.teams;
-
-        let away_team = &teams.away;
-        let away_record = &away_team.leagueRecord;
-        let home_team = &teams.home;
-        let home_record = &home_team.leagueRecord;
-        let game_state = &game.status.abstractGameState;
-
-        if game_state == "Final" || game_state == "Live" {
-            print!(
-                "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
-                " ".repeat(max_offset - away_offset), away_team.score
-            );
-            println!(
-                "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, get_game_state(&feed)
-            );
-        }
-        else {
-            print!(
-                "{} ({}-{}) {}      ", away_team.team.name, away_record.wins, away_record.losses,
-                " ".repeat(max_offset - away_offset)
-            );
-            println!(
-                "   {} {} ({}-{})    {}", " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, get_game_state(&feed)
-            );
+    let mut games: Vec<Game> = Vec::new();
+    for date in schedule.dates {
+        for game in date.games {
+            if &game.status.detailedState == "Final" {
+                games.push(game);
+            }
         }
     }
+    let mut start = 0;
+    if n_games < games.len() {
+        start = games.len() - n_games;
+    }
+    display_games(&games.drain(start..).collect(), false);
 }
