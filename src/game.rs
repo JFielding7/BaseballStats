@@ -48,7 +48,9 @@ struct Status {
 #[derive(Deserialize)]
 struct LineScore {
     innings: Vec<Inning>,
-    teams: TeamScores
+    teams: TeamScores,
+    inningState: String,
+    currentInningOrdinal: String
 }
 
 #[derive(Deserialize)]
@@ -116,6 +118,16 @@ struct Record {
 }
 
 #[derive(Deserialize)]
+struct GameState {
+    gameData: Data
+}
+
+#[derive(Deserialize)]
+struct Data {
+    status: Status
+}
+
+#[derive(Deserialize)]
 struct Stats {
     #[serde(deserialize_with = "deserialize_stats")]
     batting: Option<Batter>,
@@ -128,6 +140,23 @@ where T: serde::Deserialize<'de>, D: serde::Deserializer<'de> {
     Ok(Option::<T>::deserialize(deserializer).unwrap_or(None))
 }
 
+const STATES: [&str; 4] = ["Final", "Live", "Preview", "Other"];
+
+macro_rules! state_index {
+    ($game:expr) => {
+        STATES.iter().position(|&curr| curr == $game.status.abstractGameState).unwrap()
+    };
+}
+
+macro_rules! update_line_offset {
+    ($team:expr, $max:expr) => {{
+        let record = &$team.leagueRecord;
+        let line_offset = $team.team.name.len() + record.wins.to_string().len() + record.losses.to_string().len();
+        $max = max($max, line_offset);
+        line_offset
+    }};
+}
+
 macro_rules! games_today_url {
     () => { "https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1" };
 }
@@ -138,6 +167,10 @@ macro_rules! box_score_url {
 
 macro_rules! line_score_url {
     ($game_id:expr) => { format!("https://statsapi.mlb.com/api/v1/game/{}/linescore", $game_id) };
+}
+
+macro_rules! game_state_url {
+    ($game_id:expr) => { format!("https://statsapi.mlb.com/api/v1.1/game/{}/feed/live", $game_id) };
 }
 
 macro_rules! hitting_header {
@@ -168,12 +201,6 @@ macro_rules! pitching_row {
         )
     };
 }
-
-// macro_rules! pitching_stats {
-//     ($pitcher:expr) => {
-//         ($pitcher.stats.pitching.as_ref().unwrap(), $pitcher.seasonStats.pitching.as_ref().unwrap())
-//     };
-// }
 
 macro_rules! display_stat_table {
     ($team_stats:expr, $players:expr, $stat_type:ident, $header:ident, $row_generator:ident) => {{
@@ -254,27 +281,46 @@ fn display_winning_and_losing_pitchers(away_pitchers: &Vec<&Player>, home_pitche
     println!("\nWinning Pitcher: {}\nLosing Pitcher: {}\n", winning_pitcher, losing_pitcher);
 }
 
-fn display_line_score(line_score: &LineScore, away_team: &Team, home_team: &Team) {
+fn get_live_inning(game_id: i32, line_score: &LineScore) -> String {
+    let state: GameState = get(game_state_url!(game_id)).unwrap().json().unwrap();
+    match state.gameData.status.abstractGameState.as_str() {
+        "Live" => format!("{} {}\n", line_score.inningState, line_score.currentInningOrdinal),
+        _ => "".to_string()
+    }
+}
+
+fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, home_team: &Team) {
     let mut innings = Table::new();
     let mut innings_header: Vec<String> = vec!["Team".to_string()];
     innings_header.append(&mut line_score.innings.iter().map(|inning| inning.num.to_string()).collect());
-    innings_header.append(&mut vec!["R".to_string(), "H".to_string(), "E".to_string(), "LOB".to_string()]);
-    innings.add_row(Row::new(innings_header));
 
     let mut away_scores: Vec<String> = vec![away_team.team.name.clone()];
     let mut home_scores: Vec<String> = vec![home_team.team.name.clone()];
     for inning in &line_score.innings {
         let away_score = &inning.away;
+        let away_runs_scored = away_score.runs;
+        if away_runs_scored.is_some() {
+            away_scores.push(away_runs_scored.unwrap().to_string());
+        }
+        else {
+            away_scores.push(" ".to_string());
+        }
+
         let home_score = &inning.home;
-        away_scores.push(away_score.runs.unwrap().to_string());
         let home_runs_scored = home_score.runs;
         if home_runs_scored.is_some() {
             home_scores.push(home_runs_scored.unwrap().to_string());
         }
         else {
-            home_scores.push("X".to_string());
+            home_scores.push(" ".to_string());
         }
     }
+    for i in (line_score.innings.len() + 1)..10 {
+        innings_header.push(i.to_string());
+        away_scores.push(" ".to_string());
+        home_scores.push(" ".to_string());
+    }
+
     let away_score = &line_score.teams.away;
     let home_score = &line_score.teams.home;
     away_scores.append(&mut vec![away_score.runs.unwrap().to_string(), away_score.hits.to_string(),
@@ -282,10 +328,12 @@ fn display_line_score(line_score: &LineScore, away_team: &Team, home_team: &Team
     home_scores.append(&mut vec![home_score.runs.unwrap().to_string(), home_score.hits.to_string(),
                                  home_score.errors.to_string(), home_score.leftOnBase.to_string()]);
 
+    innings_header.append(&mut vec!["R".to_string(), "H".to_string(), "E".to_string(), "LOB".to_string()]);
+    innings.add_row(Row::new(innings_header));
     innings.add_row(Row::new(away_scores));
     innings.add_row(Row::new(home_scores));
 
-    println!("{}", innings.render());
+    println!("{}{}", get_live_inning(game_id, line_score), innings.render());
 }
 
 pub(crate) fn display_game_stats(game_id: i32) {
@@ -298,7 +346,7 @@ pub(crate) fn display_game_stats(game_id: i32) {
     let (home_hitters, home_pitchers) = hitters_and_pitchers(home_team);
 
     display_score!(away_team, home_team, line_score);
-    display_line_score(&line_score, away_team, home_team);
+    display_line_score(game_id, &line_score, away_team, home_team);
     display_record!(away_team);
     display_record!(home_team);
     display_winning_and_losing_pitchers(&away_pitchers, &home_pitchers);
@@ -310,40 +358,45 @@ pub(crate) fn display_game_stats(game_id: i32) {
     display_team_stats(home_team, &home_hitters, &home_pitchers);
 }
 
-const STATES: [&str; 4] = ["Final", "Live", "Preview", "Other"];
-macro_rules! state_index {
-    ($game:expr) => {
-        STATES.iter().position(|&curr| curr == $game.status.abstractGameState).unwrap()
-    };
-}
-
-macro_rules! update_max {
-    ($team:expr, $max:expr) => {
-        let record = &$team.leagueRecord;
-        $max = max($max, $team.team.name.len() +
-            record.wins.to_string().len() +
-            record.losses.to_string().len()
-        )
-    };
+fn format_game_state(game: &Game) -> String {
+    match game.status.abstractGameState.as_str() {
+        "Final" => "Final".to_string(),
+        "Live" => {
+            let line_score: LineScore = get(line_score_url!(game.gamePk)).unwrap().json().unwrap();
+            format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
+        },
+        _ => "".to_string()
+    }
 }
 
 pub(crate) fn display_games_today() {
-    let schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
-    let mut games = &schedule.dates[0].games;
+    let mut schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
+    let mut games: &mut Vec<Game> = &mut schedule.dates[0].games;
     games.sort_by(|game0, game1| state_index!(game0).cmp(&state_index!(game1)));
 
-    let mut max_away_len = 0;
-    let mut max_home_len = 0;
-    for game in games {
-        update_max!(&game.teams.away, max_away_len);
-        update_max!(&game.teams.home, max_home_len);
-    }
+    let mut max_offset = 0;
+    let game_line_offsets: Vec<(&Game, usize, usize)> = games.iter().map(|game| {
+        let teams = &game.teams;
+        let away_offset = update_line_offset!(teams.away, max_offset);
+        let home_offset = update_line_offset!(teams.home, max_offset);
+        (game, away_offset, home_offset)
+    }).collect();
 
-    for game in games {
-        let away_team = &game.teams.away;
-        let home_team = &game.teams.home;
+    for (game, away_offset, home_offset) in game_line_offsets {
+        let teams = &game.teams;
 
-        // print!("{} ({}-{}){}{} - ", away_team.team.name, away_team.leagueRecord.wins, away_team.leagueRecord.losses, away_team.score);
-        // println!("{} {} ({}-{})    ({})", home_team.score, home_team.team.name, home_team.leagueRecord.wins, home_team.leagueRecord.losses, game.status.abstractGameState);
+        let away_team = &teams.away;
+        let away_record = &away_team.leagueRecord;
+        print!(
+            "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
+            " ".repeat(max_offset - away_offset), away_team.score
+        );
+
+        let home_team = &teams.home;
+        let home_record = &home_team.leagueRecord;
+        println!(
+            "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
+            home_team.team.name, home_record.wins, home_record.losses, format_game_state(game)
+        );
     }
 }

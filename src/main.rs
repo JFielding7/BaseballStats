@@ -23,12 +23,12 @@ use crate::game::{display_game_stats, display_games_today};
 // }
 
 fn main() {
-    display_games_today()
-    display_game_stats(10052);
-    display_standings().expect("Fail");
-    let query = env::args().collect();
-    teams::display_team_stats(&query);
-    stats::display_stats(&query);
-    pitching_stats::display_pitching_stats(&query);
-    hitting_stats::display_hitting_stats(&query);
+    // display_games_today();
+    display_game_stats(746199);
+    // display_standings().expect("Fail");
+    // let query = env::args().collect();
+    // teams::display_team_stats(&query);
+    // stats::display_stats(&query);
+    // pitching_stats::display_pitching_stats(&query);
+    // hitting_stats::display_hitting_stats(&query);
 }
