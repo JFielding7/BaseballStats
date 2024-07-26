@@ -36,6 +36,7 @@ struct PlayingTeams {
 #[derive(Deserialize)]
 struct PlayingTeam {
     leagueRecord: Record,
+    #[serde(default)]
     score: i32,
     team: database::Team
 }
@@ -46,10 +47,37 @@ struct Status {
 }
 
 #[derive(Deserialize)]
+struct Feed {
+    gameData: Data,
+    liveData: LiveData
+}
+
+#[derive(Deserialize)]
+struct Data {
+    datetime: DateTime,
+    status: Status
+}
+
+#[derive(Deserialize)]
+struct DateTime {
+    dateTime: String,
+    time: String,
+    ampm: String
+}
+
+#[derive(Deserialize)]
+struct LiveData {
+    linescore: LineScore,
+    // boxscore: BoxScore
+}
+
+#[derive(Deserialize)]
 struct LineScore {
     innings: Vec<Inning>,
     teams: TeamScores,
+    #[serde(default)]
     inningState: String,
+    #[serde(default)]
     currentInningOrdinal: String
 }
 
@@ -117,15 +145,6 @@ struct Record {
     losses: i32,
 }
 
-#[derive(Deserialize)]
-struct GameState {
-    gameData: Data
-}
-
-#[derive(Deserialize)]
-struct Data {
-    status: Status
-}
 
 #[derive(Deserialize)]
 struct Stats {
@@ -169,7 +188,7 @@ macro_rules! line_score_url {
     ($game_id:expr) => { format!("https://statsapi.mlb.com/api/v1/game/{}/linescore", $game_id) };
 }
 
-macro_rules! game_state_url {
+macro_rules! game_feed_url {
     ($game_id:expr) => { format!("https://statsapi.mlb.com/api/v1.1/game/{}/feed/live", $game_id) };
 }
 
@@ -282,7 +301,8 @@ fn display_winning_and_losing_pitchers(away_pitchers: &Vec<&Player>, home_pitche
 }
 
 fn get_live_inning(game_id: i32, line_score: &LineScore) -> String {
-    let state: GameState = get(game_state_url!(game_id)).unwrap().json().unwrap();
+    println!("hello");
+    let state: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
     match state.gameData.status.abstractGameState.as_str() {
         "Live" => format!("{} {}\n", line_score.inningState, line_score.currentInningOrdinal),
         _ => "".to_string()
@@ -358,12 +378,22 @@ pub(crate) fn display_game_stats(game_id: i32) {
     display_team_stats(home_team, &home_hitters, &home_pitchers);
 }
 
-fn format_game_state(game: &Game) -> String {
+fn format_game_state(game: &Game, feed: &Feed) -> String {
     match game.status.abstractGameState.as_str() {
         "Final" => "Final".to_string(),
         "Live" => {
-            let line_score: LineScore = get(line_score_url!(game.gamePk)).unwrap().json().unwrap();
+            let line_score = &feed.liveData.linescore;
             format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
+        },
+        "Preview" => {
+            const EST_OFFSET: i32 = 19;
+            const HOURS: i32 = 12;
+
+            let date_time = &feed.gameData.datetime;
+            let hour_index = date_time.dateTime.find(":").unwrap();
+            let hour = (date_time.dateTime[hour_index - 2..hour_index].parse::<i32>().unwrap() + EST_OFFSET) % HOURS + 1;
+            let minutes = &date_time.time[date_time.time.find(":").unwrap()..];
+            format!("{}{} {}", hour, minutes, date_time.ampm)
         },
         _ => "".to_string()
     }
@@ -372,31 +402,44 @@ fn format_game_state(game: &Game) -> String {
 pub(crate) fn display_games_today() {
     let mut schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
     let mut games: &mut Vec<Game> = &mut schedule.dates[0].games;
-    games.sort_by(|game0, game1| state_index!(game0).cmp(&state_index!(game1)));
 
     let mut max_offset = 0;
-    let game_line_offsets: Vec<(&Game, usize, usize)> = games.iter().map(|game| {
+    let game_line_offsets: Vec<(&Game, Feed, usize, usize)> = games.iter().map(|game| {
+        let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
         let teams = &game.teams;
         let away_offset = update_line_offset!(teams.away, max_offset);
         let home_offset = update_line_offset!(teams.home, max_offset);
-        (game, away_offset, home_offset)
+        (game, feed, away_offset, home_offset)
     }).collect();
 
-    for (game, away_offset, home_offset) in game_line_offsets {
+    for (game, feed, away_offset, home_offset) in game_line_offsets {
         let teams = &game.teams;
 
         let away_team = &teams.away;
         let away_record = &away_team.leagueRecord;
-        print!(
-            "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
-            " ".repeat(max_offset - away_offset), away_team.score
-        );
-
         let home_team = &teams.home;
         let home_record = &home_team.leagueRecord;
-        println!(
-            "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
-            home_team.team.name, home_record.wins, home_record.losses, format_game_state(game)
-        );
+        let game_state = &game.status.abstractGameState;
+
+        if game_state == "Final" || game_state == "Live" {
+            print!(
+                "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
+                " ".repeat(max_offset - away_offset), away_team.score
+            );
+            println!(
+                "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
+                home_team.team.name, home_record.wins, home_record.losses, format_game_state(game, &feed)
+            );
+        }
+        else {
+            print!(
+                "{} ({}-{}) {}      ", away_team.team.name, away_record.wins, away_record.losses,
+                " ".repeat(max_offset - away_offset)
+            );
+            println!(
+                "   {} {} ({}-{})    {}", " ".repeat(max_offset - home_offset),
+                home_team.team.name, home_record.wins, home_record.losses, format_game_state(game, &feed)
+            );
+        }
     }
 }
