@@ -42,6 +42,12 @@ macro_rules! roster_url {
     () => { "https://statsapi.mlb.com/api/v1/teams/{}/roster?rosterType=fullSeason" };
 }
 
+macro_rules! stats_url {
+    ($team_id:expr) => {
+        format!("https://statsapi.mlb.com/api/v1/teams/{}/stats?group=pitching,hitting&stats=season", $team_id)
+    };
+}
+
 macro_rules! database_file {
     ($file:expr) => { &format!("{}/database/{}", env::current_dir().unwrap().display(), $file) };
 }
@@ -81,13 +87,9 @@ fn get_team_roster(team_id: i32) -> (Vec<Player>, Vec<Player>) {
     roster.roster.into_iter().partition(|player| player.position.abbreviation == PITCHER)
 }
 
-fn get_total_team_stats(team_id: i32) -> TeamStats {
-    get(format!("https://statsapi.mlb.com/api/v1/teams/{}/stats?group=pitching,hitting&stats=season", team_id)).unwrap().json().unwrap()
-}
-
 fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) {
     let (pitchers, hitters) = get_team_roster(team_id);
-    let team_stats = get_total_team_stats(team_id);
+    let team_stats: TeamStats = get(stats_url!(team_id)).unwrap().json().unwrap();
 
     if display_hitting {
         let mut stat_table: Table = stat_table!(BasicHittingStats, basic_hitting_header, hitters,

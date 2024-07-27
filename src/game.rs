@@ -2,6 +2,7 @@ use std::cmp::max;
 use figlet_rs::FIGfont;
 use std::collections::HashMap;
 use std::fmt::format;
+use std::iter::Map;
 use std::mem;
 use chrono::{Datelike, Utc};
 use serde::Deserialize;
@@ -151,6 +152,12 @@ struct Record {
 }
 
 #[derive(Deserialize)]
+struct WinProbability {
+    homeTeamWinProbability: f64,
+    awayTeamWinProbability: f64
+}
+
+#[derive(Deserialize)]
 struct Stats {
     #[serde(deserialize_with = "deserialize_stats")]
     batting: Option<Batter>,
@@ -183,6 +190,12 @@ macro_rules! season_games_url {
     ($team_id:expr, $season:expr) => {
         format!("https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={}&gameType=R&season={}", $team_id, $season)
     };
+}
+
+macro_rules! win_probability_url {
+    ($team_id:expr) => {
+        format!("https://statsapi.mlb.com/api/v1/game/{}/winProbability", $team_id)
+    }
 }
 
 macro_rules! hitting_header {
@@ -277,7 +290,7 @@ fn get_eastern_standard_time(date_time: &String) -> String {
     format!("{}{}{}", hour_12, minutes, time_of_day)
 }
 
-fn get_game_state(feed: Feed) -> String {
+fn get_game_state(feed: &Feed) -> String {
     match feed.gameData.status.abstractGameState.as_str() {
         "Final" => "Final".to_string(),
         "Live" => {
@@ -326,6 +339,8 @@ fn display_winning_and_losing_pitchers(away_pitchers: &Vec<&Player>, home_pitche
 }
 
 fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, home_team: &Team) {
+    const SCHEDULED_INNINGS: i32 = 9;
+    let feed: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
     let mut innings = Table::new();
     let mut innings_header: Vec<String> = vec!["Team".to_string()];
     innings_header.append(&mut line_score.innings.iter().map(|inning| inning.num.to_string()).collect());
@@ -334,18 +349,21 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
     let mut home_scores: Vec<String> = vec![home_team.team.name.clone()];
     for inning in &line_score.innings {
         let away_score = &inning.away;
-        let away_runs_scored = away_score.runs;
-        if away_runs_scored.is_some() {
-            away_scores.push(away_runs_scored.unwrap().to_string());
+        let away_score_option = away_score.runs;
+        if away_score_option.is_some() {
+            away_scores.push(away_score_option.unwrap().to_string());
         }
         else {
             away_scores.push(" ".to_string());
         }
 
         let home_score = &inning.home;
-        let home_runs_scored = home_score.runs;
-        if home_runs_scored.is_some() {
-            home_scores.push(home_runs_scored.unwrap().to_string());
+        let home_score_option = home_score.runs;
+        if home_score_option.is_some() {
+            home_scores.push(home_score_option.unwrap().to_string());
+        }
+        else if inning.num == SCHEDULED_INNINGS && &feed.gameData.status.abstractGameState == "Final" {
+            home_scores.push("X".to_string());
         }
         else {
             home_scores.push(" ".to_string());
@@ -369,8 +387,10 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
     innings.add_row(Row::new(away_scores));
     innings.add_row(Row::new(home_scores));
 
-    let feed: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
-    println!("{}\n{}", get_game_state(feed), innings.render());
+    println!("{}\n{}", get_game_state(&feed), innings.render());
+    if &feed.gameData.status.abstractGameState == "Live" {
+        display_win_probability(game_id, away_team, home_team);
+    }
 }
 
 fn display_games(games: &Vec<Game>) {
@@ -395,7 +415,7 @@ fn display_games(games: &Vec<Game>) {
                 format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
                 away_team.score, "-", home_team.score,
                 format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
-                get_game_state(feed)
+                get_game_state(&feed)
             ));
         }
         else {
@@ -403,11 +423,21 @@ fn display_games(games: &Vec<Game>) {
                 format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
                 "", "@", "",
                 format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
-                get_game_state(feed)
+                get_game_state(&feed)
             ));
         }
     }
     println!("{}", game_table.render());
+}
+
+fn display_win_probability(game_id: i32, away_team: &Team, home_team: &Team) {
+    let win_probability: Vec<WinProbability> = get(win_probability_url!(game_id)).unwrap().json().unwrap();
+    let current_probability = &win_probability[win_probability.len() - 1];
+    println!(
+        "{} Win Probability: {}%\n{} Win Probability: {}%\n", away_team.team.name,
+        current_probability.awayTeamWinProbability, home_team.team.name,
+        current_probability.homeTeamWinProbability
+    );
 }
 
 pub(crate) fn display_game_stats(game_id: i32) {
