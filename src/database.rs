@@ -99,10 +99,11 @@ struct Teams {
 #[derive(Deserialize)]
 pub(crate) struct Team {
     #[serde(default)]
-    id: i32,
+    pub(crate) id: i32,
     #[serde(default)]
-    fileCode: String,
-    pub(crate) name: String
+    pub(crate) name: String,
+    #[serde(default)]
+    fileCode: String
 }
 
 

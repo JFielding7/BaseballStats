@@ -11,20 +11,12 @@ mod stats;
 mod standings;
 mod game;
 
-use figlet_rs::FIGfont;
-use crate::game::{display_completed_games, display_game_stats, display_games_today};
-// fn main() {
-//     let small_font = FIGfont::standard().unwrap();
-//     let figure0 = small_font.convert("PHI 11 - 0 MIN").unwrap();
-//     let figure1 = small_font.convert("MIN 0").unwrap();
-//
-//     println!("{}", figure0);
-//     println!("{}", figure1);
-// }
+use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_team_schedule};
 
 fn main() {
     // display_games_today();
-    display_completed_games(143, 2024, 100000);
+    display_team_past_games(143, 2024, 8);
+    // display_team_schedule(143, 2024, 100000);
     // display_game_stats(10052);
     // display_standings().expect("Fail");
     // let query = env::args().collect();

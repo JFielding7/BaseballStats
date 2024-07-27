@@ -1,11 +1,13 @@
 use std::cmp::max;
 use figlet_rs::FIGfont;
 use std::collections::HashMap;
+use std::mem;
 use serde::Deserialize;
 use reqwest::blocking::get;
 use term_table::{row, Table};
 use term_table::row::Row;
 use term_table::table_cell::TableCell;
+use term_table::TableStyle;
 use crate::hitting_stats::{Batter};
 use crate::pitching_stats::{Pitcher};
 use crate::{database, stats};
@@ -69,6 +71,7 @@ struct DateTime {
 #[derive(Deserialize)]
 struct LiveData {
     linescore: LineScore,
+    boxscore: BoxScore
 }
 
 #[derive(Deserialize)]
@@ -410,7 +413,7 @@ fn display_games(games: &Vec<Game>, fetch_feed: bool) {
         }
         else {
             print!(
-                "{} ({}-{}) {}      ", away_team.team.name, away_record.wins, away_record.losses,
+                "{} ({}-{}) {}    @ ", away_team.team.name, away_record.wins, away_record.losses,
                 " ".repeat(max_offset - away_offset)
             );
             println!(
@@ -448,7 +451,8 @@ pub(crate) fn display_games_today() {
     display_games(&mut schedule.dates[0].games, true);
 }
 
-pub(crate) fn display_completed_games(team_id: i32, season: i32, n_games: usize) {
+// TODO: change display, not print team
+pub(crate) fn display_team_past_games(team_id: i32, season: i32, n_games: usize) {
     let schedule: Schedule = get(season_games_url!(team_id, season)).unwrap().json().unwrap();
 
     let mut games: Vec<Game> = Vec::new();
@@ -463,5 +467,55 @@ pub(crate) fn display_completed_games(team_id: i32, season: i32, n_games: usize)
     if n_games < games.len() {
         start = games.len() - n_games;
     }
-    display_games(&games.drain(start..).collect(), false);
+
+    let mut game_results = Table::new();
+    game_results.style = TableStyle::blank();
+    game_results.add_row(row!("Opponent", "Opp Record", "Result", "Record"));
+
+    for game in &games[start..] {
+        let teams = &game.teams;
+        let mut opp = &teams.away;
+        let mut opp_record = &opp.leagueRecord;
+        let mut team = &teams.home;
+        let mut team_record = &team.leagueRecord;
+        let mut symbol = "vs";
+
+        if opp.team.id == team_id {
+            mem::swap(&mut team, &mut opp);
+            mem::swap(&mut team_record, &mut opp_record);
+            symbol = "@ ";
+        }
+
+        let mut res = "W";
+        if team.score < opp.score {
+            res = "L";
+        }
+
+        game_results.add_row(row!(
+            format!("{} {}", symbol, opp.team.name),
+            format!("({}-{})", opp.leagueRecord.wins, opp.leagueRecord.losses),
+            format!("{} {}-{}", res, team.score, opp.score),
+            format!("({}-{})", team_record.wins, team_record.losses)
+        ));
+    }
+    println!("{}", game_results.render());
 }
+
+// TODO: fix
+// pub(crate) fn display_team_schedule(team_id: i32, season: i32, n_games: usize) {
+//     let schedule: Schedule = get(season_games_url!(team_id, season)).unwrap().json().unwrap();
+//
+//     let mut games: Vec<Game> = Vec::new();
+//     for date in schedule.dates {
+//         for game in date.games {
+//             if &game.status.abstractGameState != "Final" {
+//                 games.push(game);
+//             }
+//         }
+//     }
+//     let mut start = 0;
+//     if n_games < games.len() {
+//         start = games.len() - n_games;
+//     }
+//     display_games(&games.drain(start..).collect(), false);
+// }

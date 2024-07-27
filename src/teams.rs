@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 use std::env;
-use chrono::format;
 use serde::Deserialize;
 use reqwest::blocking::get;
 use term_table::{row, Table};
@@ -86,7 +85,7 @@ fn get_total_team_stats(team_id: i32) -> TeamStats {
     get(format!("https://statsapi.mlb.com/api/v1/teams/{}/stats?group=pitching,hitting&stats=season", team_id)).unwrap().json().unwrap()
 }
 
-pub(crate) fn print_team_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) {
+fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) {
     let (pitchers, hitters) = get_team_roster(team_id);
     let team_stats = get_total_team_stats(team_id);
 
@@ -118,7 +117,7 @@ pub(crate) fn display_team_stats(query: &Vec<String>) {
         for i in 1..(entry.len() - 1) {
             name.push_str(&format!("{} ", entry[i].clone()));
         }
-        print_team_stats(name, team_id, true, true);
+        display_team_season_stats(name, team_id, true, true);
     }
     else {
         println!("Invalid Team!")
