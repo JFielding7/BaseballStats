@@ -1,7 +1,9 @@
 use std::cmp::max;
 use figlet_rs::FIGfont;
 use std::collections::HashMap;
+use std::fmt::format;
 use std::mem;
+use chrono::{Datelike, Utc};
 use serde::Deserialize;
 use reqwest::blocking::get;
 use term_table::{row, Table};
@@ -25,6 +27,8 @@ struct Date {
 #[derive(Deserialize)]
 struct Game {
     gamePk: i32,
+    gameDate: String,
+    officialDate: String,
     teams: PlayingTeams,
     status: Status
 }
@@ -64,14 +68,12 @@ struct Data {
 #[derive(Deserialize)]
 struct DateTime {
     dateTime: String,
-    time: String,
-    ampm: String
 }
 
 #[derive(Deserialize)]
 struct LiveData {
     linescore: LineScore,
-    boxscore: BoxScore
+    // boxscore: BoxScore
 }
 
 #[derive(Deserialize)]
@@ -159,15 +161,6 @@ struct Stats {
 fn deserialize_stats<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
 where T: serde::Deserialize<'de>, D: serde::Deserializer<'de> {
     Ok(Option::<T>::deserialize(deserializer).unwrap_or(None))
-}
-
-macro_rules! update_line_offset {
-    ($team:expr, $max:expr) => {{
-        let record = &$team.leagueRecord;
-        let line_offset = $team.team.name.len() + record.wins.to_string().len() + record.losses.to_string().len();
-        $max = max($max, line_offset);
-        line_offset
-    }};
 }
 
 macro_rules! games_today_url {
@@ -269,12 +262,22 @@ macro_rules! display_record {
     }};
 }
 
-fn get_game_state(feed_option: Option<Feed>) -> String {
-    if feed_option.is_none() {
-        return "Final".to_string();
-    }
+fn get_eastern_standard_time(date_time: &String) -> String {
+    const EST_OFFSET: i32 = 20;
+    const HOURS: i32 = 12;
 
-    let feed = feed_option.unwrap();
+    let colon_index = date_time.find(":").unwrap();
+    let hour_24 = (date_time[colon_index - 2..colon_index].parse::<i32>().unwrap() + EST_OFFSET) % 24;
+    let hour_12 = (hour_24 + HOURS - 1) % HOURS + 1;
+    let minutes = &date_time[colon_index..colon_index + 3];
+    let mut time_of_day = "PM";
+    if hour_24 < 12 {
+        time_of_day = "AM";
+    }
+    format!("{}{}{}", hour_12, minutes, time_of_day)
+}
+
+fn get_game_state(feed: Feed) -> String {
     match feed.gameData.status.abstractGameState.as_str() {
         "Final" => "Final".to_string(),
         "Live" => {
@@ -282,15 +285,8 @@ fn get_game_state(feed_option: Option<Feed>) -> String {
             format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
         },
         "Preview" => {
-            const EST_OFFSET: i32 = 19;
-            const HOURS: i32 = 12;
-
             let date_time = &feed.gameData.datetime;
-            let hour_index = date_time.dateTime.find(":").unwrap();
-            let hour = (date_time.dateTime[hour_index - 2..hour_index]
-                .parse::<i32>().unwrap() + EST_OFFSET) % HOURS + 1;
-            let minutes = &date_time.time[date_time.time.find(":").unwrap()..];
-            format!("{}{} {}", hour, minutes, date_time.ampm)
+            get_eastern_standard_time(&date_time.dateTime)
         },
         _ => "".to_string()
     }
@@ -374,25 +370,18 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
     innings.add_row(Row::new(home_scores));
 
     let feed: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
-    println!("{}\n{}", get_game_state(Option::from(feed)), innings.render());
+    println!("{}\n{}", get_game_state(feed), innings.render());
 }
 
-fn display_games(games: &Vec<Game>, fetch_feed: bool) {
-    let mut max_offset = 0;
-    let game_line_offsets: Vec<(&Game, Option<Feed>, usize, usize)> = games.iter().map(|game| {
-        let mut feed_option = None;
-        if fetch_feed {
-            let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
-            feed_option = Option::from(feed);
-        }
-
-        let teams = &game.teams;
-        let away_offset = update_line_offset!(teams.away, max_offset);
-        let home_offset = update_line_offset!(teams.home, max_offset);
-        (game, feed_option, away_offset, home_offset)
+fn display_games(games: &Vec<Game>) {
+    let game_feeds: Vec<(&Game, Feed)> = games.iter().map(|game| {
+        let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
+        (game, feed)
     }).collect();
 
-    for (game, feed, away_offset, home_offset) in game_line_offsets {
+    let mut game_table = Table::new();
+    game_table.style = TableStyle::blank();
+    for (game, feed) in game_feeds {
         let teams = &game.teams;
 
         let away_team = &teams.away;
@@ -402,26 +391,23 @@ fn display_games(games: &Vec<Game>, fetch_feed: bool) {
         let game_state = &game.status.abstractGameState;
 
         if game_state == "Final" || game_state == "Live" {
-            print!(
-                "{} ({}-{}) {}{:>3} - ", away_team.team.name, away_record.wins, away_record.losses,
-                " ".repeat(max_offset - away_offset), away_team.score
-            );
-            println!(
-                "{:<3}{} {} ({}-{})    {}", home_team.score, " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, get_game_state(feed)
-            );
+            game_table.add_row(row!(
+                format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
+                away_team.score, "-", home_team.score,
+                format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
+                get_game_state(feed)
+            ));
         }
         else {
-            print!(
-                "{} ({}-{}) {}    @ ", away_team.team.name, away_record.wins, away_record.losses,
-                " ".repeat(max_offset - away_offset)
-            );
-            println!(
-                "   {} {} ({}-{})    {}", " ".repeat(max_offset - home_offset),
-                home_team.team.name, home_record.wins, home_record.losses, get_game_state(feed)
-            );
+            game_table.add_row(row!(
+                format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
+                "", "@", "",
+                format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
+                get_game_state(feed)
+            ));
         }
     }
+    println!("{}", game_table.render());
 }
 
 pub(crate) fn display_game_stats(game_id: i32) {
@@ -448,21 +434,37 @@ pub(crate) fn display_game_stats(game_id: i32) {
 
 pub(crate) fn display_games_today() {
     let mut schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
-    display_games(&mut schedule.dates[0].games, true);
+    display_games(&mut schedule.dates[0].games);
 }
 
-// TODO: change display, not print team
-pub(crate) fn display_team_past_games(team_id: i32, season: i32, n_games: usize) {
-    let schedule: Schedule = get(season_games_url!(team_id, season)).unwrap().json().unwrap();
-
+fn filter_games(schedule: Schedule, predicate: fn(&Game) -> bool) -> Vec<Game> {
     let mut games: Vec<Game> = Vec::new();
     for date in schedule.dates {
         for game in date.games {
-            if &game.status.detailedState == "Final" {
+            if predicate(&game) {
                 games.push(game);
             }
         }
     }
+    games
+}
+
+fn get_team_and_opp(team_id: i32, game: &Game) -> (&PlayingTeam, &PlayingTeam, &str) {
+    let teams = &game.teams;
+    let mut opp = &teams.away;
+    let mut team = &teams.home;
+    let mut symbol = "vs";
+
+    if opp.team.id == team_id {
+        mem::swap(&mut team, &mut opp);
+        symbol = "@ ";
+    }
+    (team, opp, symbol)
+}
+
+pub(crate) fn display_team_past_games(team_id: i32, n_games: usize) {
+    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
+    let games: Vec<Game> = filter_games(schedule, |game| &game.status.detailedState == "Final");
     let mut start = 0;
     if n_games < games.len() {
         start = games.len() - n_games;
@@ -473,18 +475,7 @@ pub(crate) fn display_team_past_games(team_id: i32, season: i32, n_games: usize)
     game_results.add_row(row!("Opponent", "Opp Record", "Result", "Record"));
 
     for game in &games[start..] {
-        let teams = &game.teams;
-        let mut opp = &teams.away;
-        let mut opp_record = &opp.leagueRecord;
-        let mut team = &teams.home;
-        let mut team_record = &team.leagueRecord;
-        let mut symbol = "vs";
-
-        if opp.team.id == team_id {
-            mem::swap(&mut team, &mut opp);
-            mem::swap(&mut team_record, &mut opp_record);
-            symbol = "@ ";
-        }
+        let (team, opp, symbol) = get_team_and_opp(team_id, game);
 
         let mut res = "W";
         if team.score < opp.score {
@@ -495,27 +486,29 @@ pub(crate) fn display_team_past_games(team_id: i32, season: i32, n_games: usize)
             format!("{} {}", symbol, opp.team.name),
             format!("({}-{})", opp.leagueRecord.wins, opp.leagueRecord.losses),
             format!("{} {}-{}", res, team.score, opp.score),
-            format!("({}-{})", team_record.wins, team_record.losses)
+            format!("({}-{})", team.leagueRecord.wins, team.leagueRecord.losses)
         ));
     }
     println!("{}", game_results.render());
 }
 
-// TODO: fix
-// pub(crate) fn display_team_schedule(team_id: i32, season: i32, n_games: usize) {
-//     let schedule: Schedule = get(season_games_url!(team_id, season)).unwrap().json().unwrap();
-//
-//     let mut games: Vec<Game> = Vec::new();
-//     for date in schedule.dates {
-//         for game in date.games {
-//             if &game.status.abstractGameState != "Final" {
-//                 games.push(game);
-//             }
-//         }
-//     }
-//     let mut start = 0;
-//     if n_games < games.len() {
-//         start = games.len() - n_games;
-//     }
-//     display_games(&games.drain(start..).collect(), false);
-// }
+pub(crate) fn display_schedule(team_id: i32, n_games: usize) {
+    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
+    let games: Vec<Game> = filter_games(schedule, |game| &game.status.abstractGameState == "Preview");
+    let upcoming_games: Vec<Game> = games.into_iter().take(n_games).collect();
+
+    let mut schedule_table = Table::new();
+    schedule_table.style = TableStyle::blank();
+
+    for game in &upcoming_games {
+        let (_team, opp, symbol) = get_team_and_opp(team_id, game);
+
+        schedule_table.add_row(row!(
+            format!("{} {}", symbol, opp.team.name),
+            format!("({}-{})", opp.leagueRecord.wins, opp.leagueRecord.losses),
+            format!("{}", &game.officialDate),
+            format!("{}", get_eastern_standard_time(&game.gameDate))
+        ));
+    }
+    println!("{}", schedule_table.render());
+}

@@ -11,12 +11,12 @@ mod stats;
 mod standings;
 mod game;
 
-use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_team_schedule};
+use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_schedule};
 
 fn main() {
-    // display_games_today();
-    display_team_past_games(143, 2024, 8);
-    // display_team_schedule(143, 2024, 100000);
+    display_games_today();
+    // display_team_past_games(143, 8);
+    // display_schedule(143, 4);
     // display_game_stats(10052);
     // display_standings().expect("Fail");
     // let query = env::args().collect();
