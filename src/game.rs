@@ -434,7 +434,7 @@ fn display_win_probability(game_id: i32, away_team: &Team, home_team: &Team) {
     let win_probability: Vec<WinProbability> = get(win_probability_url!(game_id)).unwrap().json().unwrap();
     let current_probability = &win_probability[win_probability.len() - 1];
     println!(
-        "{} Win Probability: {}%\n{} Win Probability: {}%\n", away_team.team.name,
+        "Win Probability:\n{}: {:.1}%\n{}: {:.1}%\n", away_team.team.name,
         current_probability.awayTeamWinProbability, home_team.team.name,
         current_probability.homeTeamWinProbability
     );

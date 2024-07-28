@@ -10,16 +10,20 @@ mod pitching_stats;
 mod stats;
 mod standings;
 mod game;
+mod leaders;
 
 use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_schedule};
+use crate::leaders::display_leaders;
+use crate::stats::Stat;
 
 fn main() {
+    let query: Vec<String> = env::args().collect();
+    display_leaders(&query);
     // display_games_today();
     // display_team_past_games(143, 8);
     // display_schedule(143, 4);
-    display_game_stats(745315);
+    // display_game_stats(744908);
     // display_standings().expect("Fail");
-    // let query = env::args().collect();
     // teams::display_team_stats(&query);
     // stats::display_stats(&query);
     // pitching_stats::display_pitching_stats(&query);
