@@ -52,9 +52,6 @@ struct Streak {
     streakCode: String
 }
 
-const AL_URL: &str = "https://statsapi.mlb.com/api/v1/standings?leagueId=103";
-const NL_URL: &str = "https://statsapi.mlb.com/api/v1/standings?leagueId=104";
-
 macro_rules! locations {
     () => { vec!["East              ", "Central           ", "West              "] };
 }
@@ -103,6 +100,9 @@ fn display_league_standings(league: &str, standings: &Standings) {
 }
 
 pub(crate) fn display_standings() -> reqwest::Result<()> {
+    const AL_URL: &str = "https://statsapi.mlb.com/api/v1/standings?leagueId=103";
+    const NL_URL: &str = "https://statsapi.mlb.com/api/v1/standings?leagueId=104";
+
     let nl_standings: Standings = get(NL_URL).unwrap().json()?;
     let al_standings: Standings = get(AL_URL).unwrap().json()?;
 

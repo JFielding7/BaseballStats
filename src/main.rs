@@ -16,14 +16,14 @@ use crate::game::{display_team_past_games, display_game_stats, display_games_tod
 use crate::leaders::display_leaders;
 use crate::stats::Stat;
 
-fn main() {
+fn main() -> reqwest::Result<()> {
     let query: Vec<String> = env::args().collect();
     match query.get(1).unwrap_or(&"".to_string()).as_str() {
         "g" => {
-            games_query(&query);
+            games_query(&query)
         }
         _ => {
-
+            display_games_today()
         }
     }
     // display_leaders(&query);

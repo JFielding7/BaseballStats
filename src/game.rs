@@ -3,11 +3,11 @@ use figlet_rs::FIGfont;
 use std::collections::HashMap;
 use std::fmt::format;
 use std::iter::Map;
-use std::mem;
+use std::{mem, panic};
 use chrono::{Datelike, Utc};
 use serde::Deserialize;
 use reqwest::blocking::get;
-use term_table::{row, Table};
+use term_table::{row, rows, Table};
 use term_table::row::Row;
 use term_table::table_cell::TableCell;
 use term_table::TableStyle;
@@ -262,10 +262,10 @@ macro_rules! winning_losing_pitchers {
 macro_rules! display_score {
     ($away_team:expr, $home_team:expr, $line_score:expr) => {
         println!("{}", FIGfont::standard().unwrap().convert(
-            &format!(
-                "{}    {} - {}    {}", $away_team.team.abbreviation, $line_score.teams.away.runs.unwrap(),
-                $line_score.teams.home.runs.unwrap(), $home_team.team.abbreviation
-            )[..]).unwrap()
+            format!(
+                "{}    {} - {}    {}", $away_team.team.abbreviation, $line_score.teams.away.runs.unwrap_or(0),
+                $line_score.teams.home.runs.unwrap_or(0), $home_team.team.abbreviation
+            ).as_str()).unwrap()
         );
     };
 }
@@ -274,6 +274,17 @@ macro_rules! display_record {
     ($team:expr) => {{
         println!("{}: {}-{}", $team.team.name, $team.team.record.wins, $team.team.record.losses);
     }};
+}
+
+macro_rules! upcoming_game {
+    ($away_team:expr, $away_record:expr, $home_team:expr, $home_record:expr, $feed:expr) => {
+        row!(
+            format!("{} ({}-{})", $away_team.team.name, $away_record.wins, $away_record.losses),
+            "", "@", "",
+            format!("{} ({}-{})", $home_team.team.name, $home_record.wins, $home_record.losses),
+            get_game_state(&$feed)
+        )
+    };
 }
 
 fn get_eastern_standard_time(date_time: &String) -> String {
@@ -315,8 +326,8 @@ fn display_team_stats(team: &Team, hitters: &Vec<&Player>, pitchers: &Vec<&Playe
 }
 
 fn hitters_and_pitchers(team: &Team) -> (Vec<&Player>, Vec<&Player>) {
-    let mut players: Vec<&Player> = team.players.values().collect();
-    let (mut hitters, mut pitchers): (Vec<&Player>, Vec<&Player>) = players
+    let players: Vec<&Player> = team.players.values().collect();
+    let (mut hitters, pitchers): (Vec<&Player>, Vec<&Player>) = players
         .iter().partition(|&&player| player.stats.batting.is_some());
     hitters.sort_by(|&player0, &player1| player0.battingOrder.cmp(&player1.battingOrder));
 
@@ -339,9 +350,14 @@ fn display_winning_and_losing_pitchers(away_pitchers: &Vec<&Player>, home_pitche
     println!("\nWinning Pitcher: {}\nLosing Pitcher: {}\n", winning_pitcher, losing_pitcher);
 }
 
-fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, home_team: &Team) {
+fn get_final_score(team_score: &Score) -> Vec<String> {
+    vec![team_score.runs.unwrap_or(0).to_string(), team_score.hits.to_string(),
+         team_score.errors.to_string(), team_score.leftOnBase.to_string()]
+}
+
+fn display_line_score(game_id: i32, feed: &Feed, line_score: &LineScore, away_team: &Team, home_team: &Team) -> reqwest::Result<()> {
     const SCHEDULED_INNINGS: i32 = 9;
-    let feed: Feed = get(game_feed_url!(game_id)).unwrap().json().unwrap();
+
     let mut innings = Table::new();
     let mut innings_header: Vec<String> = vec!["Team".to_string()];
     innings_header.append(&mut line_score.innings.iter().map(|inning| inning.num.to_string()).collect());
@@ -352,7 +368,7 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
         let away_score = &inning.away;
         let away_score_option = away_score.runs;
         if away_score_option.is_some() {
-            away_scores.push(away_score_option.unwrap().to_string());
+            away_scores.push(away_score_option.unwrap_or(0).to_string());
         }
         else {
             away_scores.push(" ".to_string());
@@ -361,7 +377,7 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
         let home_score = &inning.home;
         let home_score_option = home_score.runs;
         if home_score_option.is_some() {
-            home_scores.push(home_score_option.unwrap().to_string());
+            home_scores.push(home_score_option.unwrap_or(0).to_string());
         }
         else if inning.num == SCHEDULED_INNINGS && &feed.gameData.status.abstractGameState == "Final" {
             home_scores.push("X".to_string());
@@ -375,13 +391,8 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
         away_scores.push(" ".to_string());
         home_scores.push(" ".to_string());
     }
-
-    let away_score = &line_score.teams.away;
-    let home_score = &line_score.teams.home;
-    away_scores.append(&mut vec![away_score.runs.unwrap().to_string(), away_score.hits.to_string(),
-                                 away_score.errors.to_string(), away_score.leftOnBase.to_string()]);
-    home_scores.append(&mut vec![home_score.runs.unwrap().to_string(), home_score.hits.to_string(),
-                                 home_score.errors.to_string(), home_score.leftOnBase.to_string()]);
+    away_scores.append(&mut get_final_score(&line_score.teams.away));
+    home_scores.append(&mut get_final_score(&line_score.teams.home));
 
     innings_header.append(&mut vec!["R".to_string(), "H".to_string(), "E".to_string(), "LOB".to_string()]);
     innings.add_row(Row::new(innings_header));
@@ -390,15 +401,17 @@ fn display_line_score(game_id: i32, line_score: &LineScore, away_team: &Team, ho
 
     println!("{}\n{}", get_game_state(&feed), innings.render());
     if &feed.gameData.status.abstractGameState == "Live" {
-        display_win_probability(game_id, away_team, home_team);
+        display_win_probability(game_id, away_team, home_team)?;
     }
+    Ok(())
 }
 
-fn display_games(games: &Vec<Game>) {
-    let game_feeds: Vec<(&Game, Feed)> = games.iter().map(|game| {
-        let feed: Feed = get(game_feed_url!(game.gamePk)).unwrap().json().unwrap();
-        (game, feed)
-    }).collect();
+fn display_games(games: &Vec<Game>) -> reqwest::Result<()> {
+    let mut game_feeds: Vec<(&Game, Feed)> = Vec::with_capacity(games.len());
+    for game in games {
+        let feed: Feed = get(game_feed_url!(game.gamePk))?.json()?;
+        game_feeds.push((game, feed));
+    }
 
     let mut game_table = Table::new();
     game_table.style = TableStyle::blank();
@@ -420,52 +433,61 @@ fn display_games(games: &Vec<Game>) {
             ));
         }
         else {
-            game_table.add_row(row!(
-                format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
-                "", "@", "",
-                format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
-                get_game_state(&feed)
-            ));
+            game_table.add_row(upcoming_game!(away_team, away_record, home_team, home_record, feed));
         }
     }
     println!("{}", game_table.render());
+    Ok(())
 }
 
-fn display_win_probability(game_id: i32, away_team: &Team, home_team: &Team) {
-    let win_probability: Vec<WinProbability> = get(win_probability_url!(game_id)).unwrap().json().unwrap();
+fn display_win_probability(game_id: i32, away_team: &Team, home_team: &Team) -> reqwest::Result<()> {
+    let win_probability: Vec<WinProbability> = get(win_probability_url!(game_id))?.json()?;
     let current_probability = &win_probability[win_probability.len() - 1];
     println!(
         "Win Probability:\n{}: {:.1}%\n{}: {:.1}%\n", away_team.team.name,
         current_probability.awayTeamWinProbability, home_team.team.name,
         current_probability.homeTeamWinProbability
     );
+    Ok(())
 }
 
-pub(crate) fn display_game_stats(game_id: i32) {
-    let box_score: BoxScore = get(box_score_url!(game_id)).unwrap().json().unwrap();
-    let line_score: LineScore = get(line_score_url!(game_id)).unwrap().json().unwrap();
+pub(crate) fn display_game_stats(game_id: i32) -> reqwest::Result<()> {
+    let box_score: BoxScore = get(box_score_url!(game_id))?.json()?;
+    let line_score: LineScore = get(line_score_url!(game_id))?.json()?;
+    let feed: Feed = get(game_feed_url!(game_id))?.json()?;
 
     let away_team = &box_score.teams.away;
     let home_team = &box_score.teams.home;
     let (away_hitters, away_pitchers) = hitters_and_pitchers(away_team);
     let (home_hitters, home_pitchers) = hitters_and_pitchers(home_team);
 
-    display_score!(away_team, home_team, line_score);
-    display_line_score(game_id, &line_score, away_team, home_team);
-    display_record!(away_team);
-    display_record!(home_team);
-    display_winning_and_losing_pitchers(&away_pitchers, &home_pitchers);
+    if feed.gameData.status.abstractGameState == "Preview" {
+        let away_record = &away_team.team.record;
+        let home_record = &home_team.team.record;
+        println!("{}", Table::builder().style(TableStyle::blank())
+            .rows(rows![upcoming_game!(away_team, away_record, home_team, home_record, feed)]).build().render()
+        );
+    }
+    else {
+        display_score!(away_team, home_team, line_score);
+        display_line_score(game_id, &feed, &line_score, away_team, home_team)?;
+        display_record!(away_team);
+        display_record!(home_team);
+        display_winning_and_losing_pitchers(&away_pitchers, &home_pitchers);
 
-    const DIVIDER_LEN: usize = 128;
-    println!("{}", "-".repeat(DIVIDER_LEN));
-    display_team_stats(away_team, &away_hitters, &away_pitchers);
-    println!("{}", "-".repeat(DIVIDER_LEN));
-    display_team_stats(home_team, &home_hitters, &home_pitchers);
+        const DIVIDER_LEN: usize = 128;
+        println!("{}", "-".repeat(DIVIDER_LEN));
+        display_team_stats(away_team, &away_hitters, &away_pitchers);
+        println!("{}", "-".repeat(DIVIDER_LEN));
+        display_team_stats(home_team, &home_hitters, &home_pitchers);
+    }
+    Ok(())
 }
 
-pub(crate) fn display_games_today() {
-    let mut schedule: Schedule = get(games_url!("")).unwrap().json().unwrap();
-    display_games(&mut schedule.dates[0].games);
+pub(crate) fn display_games_today() -> reqwest::Result<()> {
+    let mut schedule: Schedule = get(games_url!(""))?.json()?;
+    display_games(&mut schedule.dates[0].games)?;
+    Ok(())
 }
 
 fn filter_games(schedule: Schedule, predicate: fn(&Game) -> bool) -> Vec<Game> {
@@ -493,8 +515,8 @@ fn get_team_and_opp(team_id: i32, game: &Game) -> (&PlayingTeam, &PlayingTeam, &
     (team, opp, symbol)
 }
 
-pub(crate) fn display_team_past_games(team_id: i32, limit: usize) {
-    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
+pub(crate) fn display_team_past_games(team_id: i32, limit: usize) -> reqwest::Result<()> {
+    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year()))?.json()?;
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.detailedState == "Final");
     let mut start = 0;
     if limit < games.len() {
@@ -521,10 +543,11 @@ pub(crate) fn display_team_past_games(team_id: i32, limit: usize) {
         ));
     }
     println!("{}", game_results.render());
+    Ok(())
 }
 
-pub(crate) fn display_schedule(team_id: i32, limit: usize) {
-    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
+pub(crate) fn display_schedule(team_id: i32, limit: usize) -> reqwest::Result<()> {
+    let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year()))?.json()?;
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.abstractGameState == "Preview");
     let upcoming_games: Vec<Game> = games.into_iter().take(limit).collect();
 
@@ -542,39 +565,47 @@ pub(crate) fn display_schedule(team_id: i32, limit: usize) {
         ));
     }
     println!("{}", schedule_table.render());
+    Ok(())
 }
 
-fn get_game_id(team: &String, date: &String) -> i32 {
+fn get_game_id(team: &String, date: &String) -> reqwest::Result<i32> {
     let (_, team_id) = get_team(team);
     let schedule: Schedule = if date.is_empty() {
-        get(games_url!(format!("&teamId={team_id}"))).unwrap().json().unwrap()
+        get(games_url!(format!("&teamId={team_id}")))?.json()?
     }
     else {
-        get(games_url!(format!("&teamId={team_id}&startDate={date}&endDate={date}"))).unwrap().json().unwrap()
+        get(games_url!(format!("&teamId={team_id}&startDate={date}&endDate={date}")))?.json()?
     };
     if schedule.dates.len() > 0 {
-       return schedule.dates[0].games[0].gamePk;
+       return Ok(schedule.dates[0].games[0].gamePk);
     }
-    -1
+    Ok(-1)
 }
 
-pub(crate) fn games_query(query: &Vec<String>) {
+pub(crate) fn games_query(query: &Vec<String>) -> reqwest::Result<()> {
     const TEAM_INDEX: usize = 2;
     const DATE_INDEX: usize = 3;
 
     let team = &query.get(TEAM_INDEX).unwrap_or(&"".to_string()).to_ascii_lowercase();
     match team.as_str() {
-        "" => display_games_today(),
+        "" => {
+            display_games_today()?;
+            Ok(())
+        },
         _ => {
             let empty = &"".to_string();
             let date = query.get(DATE_INDEX).unwrap_or(empty);
-            let game_id = get_game_id(team, date);
+            let game_id = get_game_id(team, date)?;
             if game_id.is_positive() {
-                display_game_stats(game_id);
+                display_game_stats(game_id)?;
+            }
+            else if date.is_empty() {
+                println!("No games for {team} today");
             }
             else {
-                println!("No games for {team} on {date}")
+                println!("No games for {team} on {date}");
             }
+            Ok(())
         }
     }
 }

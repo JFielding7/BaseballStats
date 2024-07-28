@@ -60,7 +60,7 @@ pub(crate) fn update_players(all_time: bool) -> Result<()> {
         let mut i = 0;
         let is_multiple_players = players.len() > 1;
         for (player_id, position) in players {
-            let mut distinct_name;
+            let distinct_name;
             if is_multiple_players {
                 distinct_name = format!("{}-{}-{}", name.clone(), i, position);
             }
