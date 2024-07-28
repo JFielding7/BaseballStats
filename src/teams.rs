@@ -107,13 +107,18 @@ fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: b
     }
 }
 
-pub(crate) fn display_team_stats(query: &Vec<String>) {
+pub(crate) fn get_team(abbreviation: &String) -> (Vec<String>, i32) {
     const ID_LEN: usize = 3;
-    let team = &query[1];
 
-    let entry = get_entry(database_file!("team_ids.txt"), team, ID_LEN).unwrap();
-
+    let entry = get_entry(database_file!("team_ids.txt"), abbreviation, ID_LEN).unwrap();
     let team_id = entry[entry.len() - 1].parse::<i32>().unwrap();
+    (entry, team_id)
+}
+
+pub(crate) fn display_team_stats(query: &Vec<String>) {
+    let team = &query[1];
+    let (entry, team_id) = get_team(team);
+
     if team_id.is_positive() {
         let mut name: String = "".to_string();
         for i in 1..(entry.len() - 1) {

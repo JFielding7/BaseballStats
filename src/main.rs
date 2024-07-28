@@ -12,13 +12,21 @@ mod standings;
 mod game;
 mod leaders;
 
-use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_schedule};
+use crate::game::{display_team_past_games, display_game_stats, display_games_today, display_schedule, games_query};
 use crate::leaders::display_leaders;
 use crate::stats::Stat;
 
 fn main() {
     let query: Vec<String> = env::args().collect();
-    display_leaders(&query);
+    match query.get(1).unwrap_or(&"".to_string()).as_str() {
+        "g" => {
+            games_query(&query);
+        }
+        _ => {
+
+        }
+    }
+    // display_leaders(&query);
     // display_games_today();
     // display_team_past_games(143, 8);
     // display_schedule(143, 4);

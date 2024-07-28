@@ -1,9 +1,8 @@
 use reqwest::blocking::get;
 use serde::Deserialize;
-use term_table::{row, Table, TableBuilder, TableStyle, rows};
+use term_table::{row, Table, rows};
 use term_table::row::Row;
 use term_table::table_cell::{Alignment, TableCell};
-
 use phf;
 use phf_macros::phf_map;
 
@@ -102,11 +101,11 @@ fn display_stat_leaders(stats: Stats, limit: i32) {
 }
 
 pub(crate) fn display_leaders(query: &Vec<String>) {
-    const PARAM_INDEX: usize = 2;
+    const CATEGORY_INDEX: usize = 2;
     const LIMIT_INDEX: usize = 3;
     const DEFAULT_LIMIT: i32 = 8;
 
-    let stats= match query.get(PARAM_INDEX).unwrap_or(&"".to_string()).to_lowercase().as_str() {
+    let stats= match query.get(CATEGORY_INDEX).unwrap_or(&"".to_string()).to_lowercase().as_str() {
         "b" => Stats::Batting,
         "p" => Stats::Pitching,
         "avg" => Stats::Stat("battingAverage", "hitting"),

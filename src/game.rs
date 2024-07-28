@@ -14,6 +14,7 @@ use term_table::TableStyle;
 use crate::hitting_stats::{Batter};
 use crate::pitching_stats::{Pitcher};
 use crate::{database, stats};
+use crate::teams::get_team;
 
 #[derive(Deserialize)]
 struct Schedule {
@@ -170,8 +171,8 @@ where T: serde::Deserialize<'de>, D: serde::Deserializer<'de> {
     Ok(Option::<T>::deserialize(deserializer).unwrap_or(None))
 }
 
-macro_rules! games_today_url {
-    () => { "https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1" };
+macro_rules! games_url {
+    ($queries:expr) => { format!("https://statsapi.mlb.com/api/v1/schedule/games/?sportId=1{}", $queries) };
 }
 
 macro_rules! box_score_url {
@@ -463,7 +464,7 @@ pub(crate) fn display_game_stats(game_id: i32) {
 }
 
 pub(crate) fn display_games_today() {
-    let mut schedule: Schedule = get(games_today_url!()).unwrap().json().unwrap();
+    let mut schedule: Schedule = get(games_url!("")).unwrap().json().unwrap();
     display_games(&mut schedule.dates[0].games);
 }
 
@@ -492,12 +493,12 @@ fn get_team_and_opp(team_id: i32, game: &Game) -> (&PlayingTeam, &PlayingTeam, &
     (team, opp, symbol)
 }
 
-pub(crate) fn display_team_past_games(team_id: i32, n_games: usize) {
+pub(crate) fn display_team_past_games(team_id: i32, limit: usize) {
     let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.detailedState == "Final");
     let mut start = 0;
-    if n_games < games.len() {
-        start = games.len() - n_games;
+    if limit < games.len() {
+        start = games.len() - limit;
     }
 
     let mut game_results = Table::new();
@@ -522,10 +523,10 @@ pub(crate) fn display_team_past_games(team_id: i32, n_games: usize) {
     println!("{}", game_results.render());
 }
 
-pub(crate) fn display_schedule(team_id: i32, n_games: usize) {
+pub(crate) fn display_schedule(team_id: i32, limit: usize) {
     let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year())).unwrap().json().unwrap();
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.abstractGameState == "Preview");
-    let upcoming_games: Vec<Game> = games.into_iter().take(n_games).collect();
+    let upcoming_games: Vec<Game> = games.into_iter().take(limit).collect();
 
     let mut schedule_table = Table::new();
     schedule_table.style = TableStyle::blank();
@@ -541,4 +542,39 @@ pub(crate) fn display_schedule(team_id: i32, n_games: usize) {
         ));
     }
     println!("{}", schedule_table.render());
+}
+
+fn get_game_id(team: &String, date: &String) -> i32 {
+    let (_, team_id) = get_team(team);
+    let schedule: Schedule = if date.is_empty() {
+        get(games_url!(format!("&teamId={team_id}"))).unwrap().json().unwrap()
+    }
+    else {
+        get(games_url!(format!("&teamId={team_id}&startDate={date}&endDate={date}"))).unwrap().json().unwrap()
+    };
+    if schedule.dates.len() > 0 {
+       return schedule.dates[0].games[0].gamePk;
+    }
+    -1
+}
+
+pub(crate) fn games_query(query: &Vec<String>) {
+    const TEAM_INDEX: usize = 2;
+    const DATE_INDEX: usize = 3;
+
+    let team = &query.get(TEAM_INDEX).unwrap_or(&"".to_string()).to_ascii_lowercase();
+    match team.as_str() {
+        "" => display_games_today(),
+        _ => {
+            let empty = &"".to_string();
+            let date = query.get(DATE_INDEX).unwrap_or(empty);
+            let game_id = get_game_id(team, date);
+            if game_id.is_positive() {
+                display_game_stats(game_id);
+            }
+            else {
+                println!("No games for {team} on {date}")
+            }
+        }
+    }
 }
