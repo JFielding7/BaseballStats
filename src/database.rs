@@ -1,7 +1,6 @@
 use std::cmp::max;
 use std::collections::{HashMap};
 use std::fs::File;
-use std::io;
 use std::io::{LineWriter, Write};
 use serde::Deserialize;
 use chrono::{Datelike, Utc};

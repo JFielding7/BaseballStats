@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::{env, io};
+use std::{env};
 use serde::Deserialize;
 use reqwest::blocking::get;
 use term_table::{row, Table};
@@ -24,7 +24,6 @@ struct Player {
 #[derive(Deserialize)]
 struct Person {
     id: i32,
-    fullName: String
 }
 
 #[derive(Deserialize)]

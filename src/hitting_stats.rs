@@ -1,4 +1,3 @@
-use std::fmt::{Display};
 use serde::Deserialize;
 use term_table::table_cell::TableCell;
 use term_table::row::Row;

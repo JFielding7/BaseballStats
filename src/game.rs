@@ -1,9 +1,6 @@
-use std::cmp::max;
 use figlet_rs::FIGfont;
 use std::collections::HashMap;
-use std::fmt::format;
-use std::iter::Map;
-use std::{mem, panic};
+use std::{mem};
 use chrono::{Datelike, Utc};
 use serde::Deserialize;
 use reqwest::blocking::get;
@@ -13,7 +10,7 @@ use term_table::table_cell::TableCell;
 use term_table::TableStyle;
 use crate::hitting_stats::{Batter};
 use crate::pitching_stats::{Pitcher};
-use crate::{database, query, stats};
+use crate::{database, stats};
 use crate::query::{empty, get_query_param, QueryError};
 use crate::teams::get_team;
 

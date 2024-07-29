@@ -1,9 +1,7 @@
 use serde::Deserialize;
 
 use std::env;
-use std::fmt::{Display};
 use std::fs::File;
-use std::io;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::hitting_stats::display_hitting_stats;
 use crate::pitching_stats::display_pitching_stats;

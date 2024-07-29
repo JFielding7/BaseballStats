@@ -1,7 +1,4 @@
-use reqwest::Error as ReqwestError;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum QueryError {
     #[error("{0}")]
     QueryTooShort(String),
@@ -12,7 +9,7 @@ pub enum QueryError {
     #[error("No Database found for query {0}")]
     DataBaseError(String),
     #[error(transparent)]
-    ReqwestError(#[from] ReqwestError),
+    ReqwestError(#[from] reqwest::Error),
     #[error(transparent)]
     IOError(#[from] std::io::Error)
 }

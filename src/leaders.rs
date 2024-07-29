@@ -58,7 +58,7 @@ enum Stats {
 
 macro_rules! leaders_url {
     ($categories:expr, $group:expr, $limit:expr) => {
-        format!("https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories={}&statGroup={}&limit={}", $categories, $group, $limit);
+        format!("https://statsapi.mlb.com/api/v1/stats/leaders?leaderCategories={}&statGroup={}&limit={}", $categories, $group, $limit)
     };
 }
 

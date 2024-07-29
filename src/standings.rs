@@ -25,7 +25,6 @@ struct Team {
     runsScored: i32,
     runsAllowed: i32,
     runDifferential: i32,
-    clinched: bool,
     records: Records
 }
 
@@ -64,20 +63,11 @@ macro_rules! division_header {
     };
 }
 
-macro_rules! team_standing {
-    ($team:expr) => {
-        row!(
-            &team.team.name, team.leagueRecord.wins, team.leagueRecord.losses,
-            &team.leagueRecord.pct,
-        );
-    };
-}
-
 fn display_league_standings(league: &str, standings: &Standings) {
     const EXPECTED_CURR_INDEX: usize = 0;
     const EXPECTED_SEASON_INDEX: usize = 1;
     const HOME_RECORD_INDEX: usize = 0;
-    const AWAY_RECORD_INDEX: usize = 0;
+    const AWAY_RECORD_INDEX: usize = 1;
     const LAST_TEN_INDEX: usize = 8;
     const WINNING_TEAMS_INDEX: usize = 11;
 
