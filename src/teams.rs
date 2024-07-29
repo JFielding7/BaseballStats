@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::env;
+use std::{env, io};
 use serde::Deserialize;
 use reqwest::blocking::get;
 use term_table::{row, Table};
@@ -8,6 +8,7 @@ use term_table::table_cell::TableCell;
 use crate::stats::{get_entry, Stat};
 use crate::hitting_stats::{get_basic_season_hitting_stats, get_basic_hitting_row, BasicHittingStats, basic_hitting_header, Batter, basic_hitting_row};
 use crate::pitching_stats::{get_season_pitching_stats, get_pitching_row, PitchingStats, pitching_header, Pitcher, pitching_row};
+use crate::query::{empty, get_query_param, QueryError};
 
 #[derive(Deserialize)]
 struct Roster {
@@ -82,14 +83,14 @@ fn pitcher_comparator(player0: &PitchingStats, player1: &PitchingStats) -> Order
         .partial_cmp(&player0.stats[0].splits[0].stat.inningsPitched.parse::<f32>().unwrap()).unwrap()
 }
 
-fn get_team_roster(team_id: i32) -> (Vec<Player>, Vec<Player>) {
-    let roster: Roster = get(format!(roster_url!(), team_id)).unwrap().json().unwrap();
-    roster.roster.into_iter().partition(|player| player.position.abbreviation == PITCHER)
+fn get_team_roster(team_id: i32) -> reqwest::Result<(Vec<Player>, Vec<Player>)> {
+    let roster: Roster = get(format!(roster_url!(), team_id))?.json()?;
+    Ok(roster.roster.into_iter().partition(|player| player.position.abbreviation == PITCHER))
 }
 
-fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) {
-    let (pitchers, hitters) = get_team_roster(team_id);
-    let team_stats: TeamStats = get(stats_url!(team_id)).unwrap().json().unwrap();
+fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: bool, display_pitching: bool) -> reqwest::Result<()> {
+    let (pitchers, hitters) = get_team_roster(team_id)?;
+    let team_stats: TeamStats = get(stats_url!(team_id))?.json()?;
 
     if display_hitting {
         let mut stat_table: Table = stat_table!(BasicHittingStats, basic_hitting_header, hitters,
@@ -105,28 +106,35 @@ fn display_team_season_stats(team_name: String, team_id: i32, display_hitting: b
         stat_table.add_row(pitching_row!("Team", &team_stats.stats.1.splits[0].stat));
         println!("\n{}Pitching Stats\n\n{}", team_name, stat_table.render());
     }
+    Ok(())
 }
 
-pub(crate) fn get_team(abbreviation: &String) -> (Vec<String>, i32) {
+pub(crate) fn get_team(abbreviation: &String) -> Result<(Vec<String>, i32), QueryError> {
     const ID_LEN: usize = 3;
 
-    let entry = get_entry(database_file!("team_ids.txt"), abbreviation, ID_LEN).unwrap();
+    let entry = get_entry(database_file!("team_ids.txt"), abbreviation, ID_LEN)?;
     let team_id = entry[entry.len() - 1].parse::<i32>().unwrap();
-    (entry, team_id)
+    Ok((entry, team_id))
 }
 
-pub(crate) fn display_team_stats(query: &Vec<String>) {
-    let team = &query[1];
-    let (entry, team_id) = get_team(team);
+pub(crate) fn display_team_stats(query: &Vec<String>) -> Result<(), QueryError> {
+    const TEAM_INDEX: usize = 2;
+    const STAT_INDEX: usize = 3;
 
-    if team_id.is_positive() {
-        let mut name: String = "".to_string();
-        for i in 1..(entry.len() - 1) {
-            name.push_str(&format!("{} ", entry[i].clone()));
-        }
-        display_team_season_stats(name, team_id, true, true);
+    let team = &query[TEAM_INDEX];
+    let (entry, team_id) = get_team(team)?;
+    let mut name: String = "".to_string();
+    for i in 1..(entry.len() - 1) {
+        name.push_str(&format!("{} ", entry[i].clone()));
     }
-    else {
-        println!("Invalid Team!")
-    }
+
+    let (display_hitting, display_pitching) =
+        match get_query_param!(query, STAT_INDEX, empty!()).as_str() {
+            "h" => (true, false),
+            "p" => (false, true),
+            _ => (true, true)
+        };
+
+    display_team_season_stats(name, team_id, display_hitting, display_pitching)?;
+    Ok(())
 }

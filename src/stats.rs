@@ -3,9 +3,12 @@ use serde::Deserialize;
 use std::env;
 use std::fmt::{Display};
 use std::fs::File;
-use std::io::{BufReader, Read, Result, Seek, SeekFrom};
+use std::io;
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use crate::hitting_stats::display_hitting_stats;
 use crate::pitching_stats::display_pitching_stats;
+use crate::query::{get_query_param, QueryError};
+use crate::query::QueryError::EntryError;
 
 #[derive(Deserialize)]
 pub(crate) struct Stat<T> {
@@ -35,7 +38,7 @@ fn no_name() -> Player {
 }
 
 macro_rules! database_file {
-    () => { &format!("{}/database/player_ids.txt", env::current_dir().unwrap().display()) };
+    () => { &format!("{}/database/player_ids.txt", env::current_dir()?.display()) };
 }
 
 fn get_line_length(file: &File) -> u64 {
@@ -53,13 +56,13 @@ fn get_line_length(file: &File) -> u64 {
     i
 }
 
-pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Vec<String>> {
+pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Vec<String>, QueryError> {
     let bytes = key.as_bytes();
     let mut player_file = File::open(file)?;
-    let file_len = player_file.metadata().unwrap().len();
+    let file_len = player_file.metadata()?.len();
     let line_len: u64 = get_line_length(&player_file);
     if key.len() > (line_len as usize) - id_len - 2 {
-        return Ok(vec![]);
+        return Err(EntryError(key.to_string()));
     }
 
     let mut start = 0;
@@ -98,45 +101,37 @@ pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Ve
             end = mid;
         }
     }
-    Ok(vec![])
+    Err(EntryError(key.to_string()))
 }
 
-pub(crate) fn display_stats(query: &Vec<String>) {
+pub(crate) fn stats_query(query: &Vec<String>) -> Result<(), QueryError> {
     const PLAYER_INDEX: usize = 2;
     const SEASON_INDEX: usize = 3;
     const MIN_LENGTH: usize = 3;
     const ID_LEN: usize = 6;
+    const IS_PITCHER_INDEX: usize = 1;
+    const ID_INDEX: usize = 2;
 
     if query.len() < MIN_LENGTH  {
-        return;
+        return Err(QueryError::QueryTooShort("No Player Provided".to_string()));
     }
 
-    let season_type: &str;
-    if query.len() == SEASON_INDEX || query[SEASON_INDEX] == "s" {
-        season_type = "season";
-    }
-    else if query[SEASON_INDEX] == "c" {
-        season_type = "career";
-    }
-    else if query[SEASON_INDEX] == "y" {
-        season_type = "yearByYear";
-    }
-    else {
-        return;
-    }
+    let default_season_type: &String = &"s".to_string();
+    let season_type: &str = match get_query_param!(query, SEASON_INDEX, default_season_type).as_str() {
+        "c" => "career",
+        "y" => "yearByYear",
+        _ => "season"
+    };
 
-    let entry= get_entry(database_file!(), &query[PLAYER_INDEX], ID_LEN).unwrap();
-    if entry.len() > 0 {
-        let id = entry[2].parse::<i32>().unwrap();
-        let is_pitcher = entry[1].as_bytes()[0] != b'0';
-        if is_pitcher {
-            display_pitching_stats(id, season_type);
-        }
-        else {
-            display_hitting_stats(id, season_type);
-        }
+    let player = &query[PLAYER_INDEX];
+    let entry= get_entry(database_file!(), player, ID_LEN)?;
+
+    let id = entry[ID_INDEX].parse::<i32>().unwrap();
+    if entry[IS_PITCHER_INDEX].as_bytes()[0] != b'0' {
+        display_pitching_stats(id, season_type)?;
     }
     else {
-        println!("Invalid player!");
+        display_hitting_stats(id, season_type)?;
     }
+    Ok(())
 }

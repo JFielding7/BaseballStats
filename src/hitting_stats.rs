@@ -121,22 +121,23 @@ fn advanced_hitting_row(advanced_split: &Split<AdvancedBatter>, stat_group: &Bat
 }
 
 pub(crate) fn get_basic_season_hitting_stats(player_id: i32) -> reqwest::Result<BasicHittingStats> {
-    get(format!(basic_season_stats_url!(), player_id)).unwrap().json()
+    let stats: BasicHittingStats = get(format!(basic_season_stats_url!(), player_id))?.json()?;
+    Ok(stats)
 }
 
-fn get_hitting_stats(player_id: i32, season_type: &str) -> (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) {
+fn get_hitting_stats(player_id: i32, season_type: &str) -> reqwest::Result<(Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>)> {
     if season_type == "yearByYear" {
         let url = format!(career_years_url!(), player_id);
-        let stats: YearByYearStats = get(url).unwrap().json().unwrap();
-        return (vec![stats.stats.0, stats.stats.1], vec![stats.stats.2, stats.stats.3]);
+        let stats: YearByYearStats = get(url)?.json()?;
+        return Ok((vec![stats.stats.0, stats.stats.1], vec![stats.stats.2, stats.stats.3]));
     }
     let url = format!(advanced_group_url!(), player_id, season_type, season_type);
-    let stats: FullHittingStats = get(url).unwrap().json().unwrap();
-    (vec![stats.stats.0], vec![stats.stats.1])
+    let stats: FullHittingStats = get(url)?.json()?;
+    Ok((vec![stats.stats.0], vec![stats.stats.1]))
 }
 
-pub(crate) fn display_hitting_stats(player_id: i32, season_type: &str) {
-    let stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) = get_hitting_stats(player_id, season_type);
+pub(crate) fn display_hitting_stats(player_id: i32, season_type: &str) -> reqwest::Result<()> {
+    let stats: (Vec<Stat<Batter>>, Vec<Stat<AdvancedBatter>>) = get_hitting_stats(player_id, season_type)?;
 
     let mut table0 = Table::new();
     table0.add_row(basic_hitting_header!("Year"));
@@ -163,4 +164,5 @@ pub(crate) fn display_hitting_stats(player_id: i32, season_type: &str) {
 
     println!("\nPlayer: {}\n\nStandard Batting:\n{}", &stats.0[0].splits[0].player.fullName, table0.render());
     println!("Advanced Batting:\n{}", table1.render());
+    Ok(())
 }

@@ -13,7 +13,8 @@ use term_table::table_cell::TableCell;
 use term_table::TableStyle;
 use crate::hitting_stats::{Batter};
 use crate::pitching_stats::{Pitcher};
-use crate::{database, stats};
+use crate::{database, query, stats};
+use crate::query::{empty, get_query_param, QueryError};
 use crate::teams::get_team;
 
 #[derive(Deserialize)]
@@ -515,7 +516,7 @@ fn get_team_and_opp(team_id: i32, game: &Game) -> (&PlayingTeam, &PlayingTeam, &
     (team, opp, symbol)
 }
 
-pub(crate) fn display_team_past_games(team_id: i32, limit: usize) -> reqwest::Result<()> {
+fn display_past_games(team_id: i32, limit: usize) -> reqwest::Result<()> {
     let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year()))?.json()?;
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.detailedState == "Final");
     let mut start = 0;
@@ -546,7 +547,7 @@ pub(crate) fn display_team_past_games(team_id: i32, limit: usize) -> reqwest::Re
     Ok(())
 }
 
-pub(crate) fn display_schedule(team_id: i32, limit: usize) -> reqwest::Result<()> {
+fn display_schedule(team_id: i32, limit: usize) -> reqwest::Result<()> {
     let schedule: Schedule = get(season_games_url!(team_id,  Utc::now().year()))?.json()?;
     let games: Vec<Game> = filter_games(schedule, |game| &game.status.abstractGameState == "Preview");
     let upcoming_games: Vec<Game> = games.into_iter().take(limit).collect();
@@ -568,44 +569,63 @@ pub(crate) fn display_schedule(team_id: i32, limit: usize) -> reqwest::Result<()
     Ok(())
 }
 
-fn get_game_id(team: &String, date: &String) -> reqwest::Result<i32> {
-    let (_, team_id) = get_team(team);
+fn get_game_id(team: &String, date: &String) -> Result<i32, QueryError> {
+    let (_, team_id) = get_team(team)?;
+
+    let today: bool;
     let schedule: Schedule = if date.is_empty() {
+        today = true;
         get(games_url!(format!("&teamId={team_id}")))?.json()?
     }
     else {
+        today = false;
         get(games_url!(format!("&teamId={team_id}&startDate={date}&endDate={date}")))?.json()?
     };
     if schedule.dates.len() > 0 {
        return Ok(schedule.dates[0].games[0].gamePk);
     }
-    Ok(-1)
+    let error_message = if today {
+        format!("No games for {team} today")
+    }
+    else {
+        format!("No games for {team} on {date}")
+    };
+    Err(QueryError::GameError(error_message))
 }
 
-pub(crate) fn games_query(query: &Vec<String>) -> reqwest::Result<()> {
+pub(crate) fn games_query(query: &Vec<String>) -> Result<(), QueryError> {
     const TEAM_INDEX: usize = 2;
     const DATE_INDEX: usize = 3;
 
-    let team = &query.get(TEAM_INDEX).unwrap_or(&"".to_string()).to_ascii_lowercase();
+    let default = empty!();
+    let team = get_query_param!(query, TEAM_INDEX, default);
     match team.as_str() {
         "" => {
             display_games_today()?;
             Ok(())
         },
         _ => {
-            let empty = &"".to_string();
-            let date = query.get(DATE_INDEX).unwrap_or(empty);
-            let game_id = get_game_id(team, date)?;
-            if game_id.is_positive() {
-                display_game_stats(game_id)?;
-            }
-            else if date.is_empty() {
-                println!("No games for {team} today");
-            }
-            else {
-                println!("No games for {team} on {date}");
-            }
+            let date = query.get(DATE_INDEX).unwrap_or(default);
+            let game_id = get_game_id(&team, date)?;
+            display_game_stats(game_id)?;
             Ok(())
         }
     }
+}
+
+pub(crate) fn season_games_query(query: &Vec<String>) -> Result<(), QueryError> {
+    const TYPE_INDEX: usize = 1;
+    const TEAM_INDEX: usize = 2;
+    const LIMIT_INDEX: usize = 3;
+    const DEFAULT_LIMIT: usize = 8;
+
+    let default = empty!();
+    let (_, team_id) = get_team(&get_query_param!(query, TEAM_INDEX, default))?;
+    let limit = &query.get(LIMIT_INDEX).unwrap_or(&DEFAULT_LIMIT.to_string()).parse::<usize>().unwrap_or(DEFAULT_LIMIT);
+
+    match query[TYPE_INDEX].to_ascii_lowercase().as_str() {
+        "r" => display_past_games(team_id, *limit)?,
+        _ => display_schedule(team_id, *limit)?
+    }
+    Ok(())
 }

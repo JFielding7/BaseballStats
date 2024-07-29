@@ -1,3 +1,4 @@
+use reqwest::blocking::get;
 use serde::Deserialize;
 use term_table::{row, Table};
 use term_table::row::Row;
@@ -79,12 +80,13 @@ macro_rules! pitching_row {
 pub(crate) use pitching_row;
 
 pub(crate) fn get_season_pitching_stats(player_id: i32) -> reqwest::Result<PitchingStats> {
-    reqwest::blocking::get(format!(pitching_stats_url!(), player_id, "season")).unwrap().json()
+    let url = format!(pitching_stats_url!(), player_id, "season");
+    Ok(get(url)?.json()?)
 }
 
-pub(crate) fn get_pitching_stats(player_id: i32, season_type: &str) -> PitchingStats {
+pub(crate) fn get_pitching_stats(player_id: i32, season_type: &str) -> reqwest::Result<PitchingStats> {
     let url = format!(pitching_stats_url!(), player_id, season_type);
-    reqwest::blocking::get(url).unwrap().json().unwrap()
+    Ok(get(url)?.json()?)
 }
 
 pub(crate) fn get_pitching_row(stats: &PitchingStats) -> Row {
@@ -92,8 +94,8 @@ pub(crate) fn get_pitching_row(stats: &PitchingStats) -> Row {
     pitching_row!(&split.player.fullName, &split.stat)
 }
 
-pub(crate) fn display_pitching_stats(player_id: i32, season_type: &str) {
-    let stats: PitchingStats = get_pitching_stats(player_id, season_type);
+pub(crate) fn display_pitching_stats(player_id: i32, season_type: &str) -> reqwest::Result<()> {
+    let stats: PitchingStats = get_pitching_stats(player_id, season_type)?;
 
     let mut table = Table::new();
     table.add_row(pitching_header!("Year"));
@@ -105,4 +107,5 @@ pub(crate) fn display_pitching_stats(player_id: i32, season_type: &str) {
     }
 
     println!("\nPlayer: {}\n\nPitching Statistics:\n{}", &stats.stats[0].splits[0].player.fullName, table.render());
+    Ok(())
 }
