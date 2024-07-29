@@ -1,6 +1,5 @@
-ana Los Angeles Angels    108
-ari Arizona Diamondbacks  109
 atl Atlanta Braves        144
+az Arizona Diamondbacks   109
 bal Baltimore Orioles     110
 bos Boston Red Sox        111
 chc Chicago Cubs          112
@@ -11,7 +10,8 @@ cws Chicago White Sox     145
 det Detroit Tigers        116
 hou Houston Astros        117
 kc Kansas City Royals     118
-la Los Angeles Dodgers    119
+laa Los Angeles Angels    108
+lad Los Angeles Dodgers   119
 mia Miami Marlins         146
 mil Milwaukee Brewers     158
 min Minnesota Twins       142
@@ -27,4 +27,4 @@ stl St. Louis Cardinals   138
 tb Tampa Bay Rays         139
 tex Texas Rangers         140
 tor Toronto Blue Jays     141
-was Washington Nationals  120
+wsh Washington Nationals  120

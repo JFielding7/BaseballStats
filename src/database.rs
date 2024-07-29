@@ -1,10 +1,12 @@
 use std::cmp::max;
 use std::collections::{HashMap};
 use std::fs::File;
-use std::io::{LineWriter, Write, Result};
+use std::io;
+use std::io::{LineWriter, Write};
 use serde::Deserialize;
 use chrono::{Datelike, Utc};
 use reqwest::blocking::{get};
+use crate::query::{empty, get_query_param, QueryError};
 
 #[derive(Deserialize)]
 struct Players {
@@ -23,9 +25,28 @@ struct Position {
     abbreviation: String
 }
 
+#[derive(Deserialize)]
+struct Teams {
+    teams: Vec<Team>
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Team {
+    #[serde(default)]
+    pub(crate) id: i32,
+    #[serde(default)]
+    pub(crate) name: String,
+    #[serde(default)]
+    abbreviation: String
+}
+
 const START_SEASON: i32 = 1876;
 
-fn get_players(all_time: bool) -> HashMap<String, HashMap<i32, String>> {
+macro_rules! players_url {
+    ($season:expr) => { format!("https://statsapi.mlb.com/api/v1/sports/1/players?season={}", $season) };
+}
+
+fn get_players(all_time: bool) -> Result<HashMap<String, HashMap<i32, String>>, QueryError> {
     let current_season = Utc::now().year();
     let mut start_season = current_season;
     if all_time { start_season = START_SEASON }
@@ -33,26 +54,27 @@ fn get_players(all_time: bool) -> HashMap<String, HashMap<i32, String>> {
     let mut baseball_players: HashMap<String, HashMap<i32, String>> = HashMap::new();
 
     for season in start_season..(current_season + 1) {
-        let url = format!("https://statsapi.mlb.com/api/v1/sports/1/players?season={}", season);
-        let players: Players = get(url).unwrap().json().unwrap();
+        let players: Players = get(players_url!(season))?.json()?;
         for player in &players.people {
             let name_key = &player.nameSlug;
             let name = name_key[..name_key.rfind("-").unwrap()].to_string();
 
-            let players = baseball_players.get_mut(&name);
-            if players.is_none() {
-                baseball_players.insert(name, HashMap::from([(player.id, player.primaryPosition.abbreviation.clone())]));
-            }
-            else {
-                players.unwrap().insert(player.id, player.primaryPosition.abbreviation.clone());
-            }
+            match baseball_players.get_mut(&name) {
+                Some(players) => {
+                    players.insert(player.id, player.primaryPosition.abbreviation.clone());
+                },
+                None => {
+                    baseball_players.insert(name, HashMap::from(
+                        [(player.id, player.primaryPosition.abbreviation.clone())]));
+                }
+            };
         }
     }
-    baseball_players
+    Ok(baseball_players)
 }
 
-pub(crate) fn update_players(all_time: bool) -> Result<()> {
-    let baseball_players = get_players(all_time);
+pub(crate) fn update_players(all_time: bool) -> Result<(), QueryError> {
+    let baseball_players = get_players(all_time)?;
     let mut sorted_players: Vec<(String, bool, &i32)> = Vec::with_capacity(baseball_players.len());
 
     let mut max_len = 0;
@@ -90,26 +112,9 @@ pub(crate) fn update_players(all_time: bool) -> Result<()> {
     Ok(())
 }
 
-
-#[derive(Deserialize)]
-struct Teams {
-    teams: Vec<Team>
-}
-
-#[derive(Deserialize)]
-pub(crate) struct Team {
-    #[serde(default)]
-    pub(crate) id: i32,
-    #[serde(default)]
-    pub(crate) name: String,
-    #[serde(default)]
-    fileCode: String
-}
-
-
-pub(crate) fn update_teams() -> Result<()> {
+pub(crate) fn update_teams() -> Result<(), QueryError> {
     let url = "https://statsapi.mlb.com/api/v1/teams?sportId=1";
-    let mut teams: Teams = get(url).unwrap().json().unwrap();
+    let mut teams: Teams = get(url)?.json()?;
 
     let team_id_file = File::create("database/team_ids.txt")?;
     let mut team_id_writer = LineWriter::new(team_id_file);
@@ -119,13 +124,15 @@ pub(crate) fn update_teams() -> Result<()> {
 
     let mut max_len = 0;
     for team in &teams.teams {
-        max_len = max(max_len, team.fileCode.len() + team.name.len());
+        max_len = max(max_len, team.abbreviation.len() + team.name.len());
     }
-    teams.teams.sort_by(|team0, team1| team0.fileCode.cmp(&team1.fileCode));
+    teams.teams.sort_by(|team0, team1| team0.abbreviation.cmp(&team1.abbreviation));
 
     for team in &teams.teams {
-        writeln!(team_id_writer, "{} {}{} {}", &team.fileCode, &team.name, " ".repeat(max_len - team.fileCode.len() - team.name.len()), team.id)?;
-        writeln!(team_writer, "{}", &team.fileCode)?;
+        writeln!(team_id_writer, "{} {}{} {}",
+            &team.abbreviation.to_ascii_lowercase(), &team.name,
+            " ".repeat(max_len - team.abbreviation.len() - team.name.len()), team.id)?;
+        writeln!(team_writer, "{}", &team.abbreviation.to_ascii_lowercase())?;
     }
     team_id_writer.flush()?;
     team_writer.flush()?;
@@ -133,8 +140,19 @@ pub(crate) fn update_teams() -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn update_database(all_time: bool) -> Result<()>  {
-    update_players(all_time)?;
-    update_teams()?;
-    Ok(())
+pub(crate) fn update_database(query: &Vec<String>) -> Result<(), QueryError>  {
+    const DATASET_INDEX: usize = 2;
+
+    let data_set = get_query_param!(query, DATASET_INDEX, empty!());
+    match data_set.as_str() {
+        "p" => {
+            update_players(false)?;
+            Ok(())
+        },
+        "t" => {
+            update_teams()?;
+            Ok(())
+        },
+        _ => Err(QueryError::DataBaseError(data_set))
+    }
 }

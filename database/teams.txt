@@ -1,6 +1,5 @@
-ana
-ari
 atl
+az
 bal
 bos
 chc
@@ -11,7 +10,8 @@ cws
 det
 hou
 kc
-la
+laa
+lad
 mia
 mil
 min
@@ -27,4 +27,4 @@ stl
 tb
 tex
 tor
-was
+wsh

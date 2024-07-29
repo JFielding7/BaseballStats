@@ -9,6 +9,8 @@ pub enum QueryError {
     GameError(String),
     #[error("No entry found for {0}")]
     EntryError(String),
+    #[error("No Database found for query {0}")]
+    DataBaseError(String),
     #[error(transparent)]
     ReqwestError(#[from] ReqwestError),
     #[error(transparent)]
