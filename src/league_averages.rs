@@ -1,7 +1,7 @@
-use regex::{Regex, RegexBuilder};
+use regex::{Regex};
 use term_table::row::{Row};
 use term_table::{row, Table, TableStyle};
-use term_table::table_cell::{Alignment, TableCell};
+use term_table::table_cell::{TableCell};
 use crate::query::{empty, get_query_param, QueryError};
 
 macro_rules! batting_url {
@@ -35,7 +35,7 @@ pub(crate) fn display_league_averages(query: &Vec<String>, is_batting: bool) -> 
 
     let table_regex = Regex::new(r"<tbody>[\S\s]*?League Year-By-Year").unwrap();
     let row_regex = Regex::new(r"<tr >(<th.*?</th>).*?</tr>").unwrap();
-    let col_regex = Regex::new(r">([\d.]+)<").unwrap();
+    let col_regex = Regex::new(r">([\d.]*)</(td|a)>").unwrap();
 
     let mut table = Table::new();
     table.style = TableStyle::thin();
