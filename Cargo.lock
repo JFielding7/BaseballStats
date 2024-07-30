@@ -547,6 +547,7 @@ dependencies = [
  "figlet-rs",
  "phf",
  "phf_macros",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

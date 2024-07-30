@@ -36,7 +36,7 @@ fn no_name() -> Player {
 }
 
 macro_rules! database_file {
-    () => { &format!("{}/database/player_ids.txt", env::current_dir()?.display()) };
+    () => { &format!("{}/database/player_ids.txt", env!("CARGO_MANIFEST_DIR")) };
 }
 
 fn get_line_length(file: &File) -> u64 {

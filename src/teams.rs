@@ -49,7 +49,7 @@ macro_rules! stats_url {
 }
 
 macro_rules! database_file {
-    ($file:expr) => { &format!("{}/database/{}", env::current_dir().unwrap().display(), $file) };
+    ($file:expr) => { &format!("{}/database/{}", env!("CARGO_MANIFEST_DIR"), $file) };
 }
 
 macro_rules! stat_table {
@@ -119,6 +119,11 @@ pub(crate) fn get_team(abbreviation: &String) -> Result<(Vec<String>, i32), Quer
 pub(crate) fn display_team_stats(query: &Vec<String>) -> Result<(), QueryError> {
     const TEAM_INDEX: usize = 2;
     const STAT_INDEX: usize = 3;
+    const MIN_LENGTH: usize = 3;
+
+    if query.len() < MIN_LENGTH {
+        return Err(QueryError::QueryTooShort("No Team Provided".to_string()));
+    }
 
     let team = &query[TEAM_INDEX];
     let (entry, team_id) = get_team(team)?;
