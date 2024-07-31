@@ -134,8 +134,8 @@ pub(crate) fn display_team_stats(query: &Vec<String>) -> Result<(), QueryError> 
 
     let (display_hitting, display_pitching) =
         match get_query_param!(query, STAT_INDEX, empty!()).as_str() {
-            "h" => (true, false),
-            "p" => (false, true),
+            "h" | "hitting" => (true, false),
+            "p" | "pitching" => (false, true),
             _ => (true, true)
         };
 

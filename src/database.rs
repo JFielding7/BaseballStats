@@ -45,6 +45,10 @@ macro_rules! players_url {
     ($season:expr) => { format!("https://statsapi.mlb.com/api/v1/sports/1/players?season={}", $season) };
 }
 
+macro_rules! file_path {
+    ($path:expr) => { format!("{}/{}", env!("CARGO_MANIFEST_DIR"), $path) };
+}
+
 fn get_players(all_time: bool) -> Result<HashMap<String, HashMap<i32, String>>, QueryError> {
     let current_season = Utc::now().year();
     let mut start_season = current_season;
@@ -95,10 +99,10 @@ pub(crate) fn update_players(all_time: bool) -> Result<(), QueryError> {
     }
     sorted_players.sort();
 
-    let player_id_file = File::create("database/player_ids.txt")?;
+    let player_id_file = File::create(file_path!("database/player_ids.txt"))?;
     let mut player_id_writer = LineWriter::new(player_id_file);
 
-    let player_file = File::create("database/players.txt")?;
+    let player_file = File::create(file_path!("auto_complete/players.txt"))?;
     let mut player_writer = LineWriter::new(player_file);
 
     for (name, is_pitcher, id) in sorted_players {
@@ -115,10 +119,10 @@ pub(crate) fn update_teams() -> Result<(), QueryError> {
     let url = "https://statsapi.mlb.com/api/v1/teams?sportId=1";
     let mut teams: Teams = get(url)?.json()?;
 
-    let team_id_file = File::create("database/team_ids.txt")?;
+    let team_id_file = File::create(file_path!("database/team_ids.txt"))?;
     let mut team_id_writer = LineWriter::new(team_id_file);
 
-    let team_file = File::create("database/teams.txt")?;
+    let team_file = File::create(file_path!("auto_complete/teams.txt"))?;
     let mut team_writer = LineWriter::new(team_file);
 
     let mut max_len = 0;
@@ -144,11 +148,11 @@ pub(crate) fn update_database(query: &Vec<String>) -> Result<(), QueryError>  {
 
     let data_set = get_query_param!(query, DATASET_INDEX, empty!());
     match data_set.as_str() {
-        "p" => {
+        "p" | "players" => {
             update_players(false)?;
             Ok(())
         },
-        "t" => {
+        "t" | "teams" => {
             update_teams()?;
             Ok(())
         },

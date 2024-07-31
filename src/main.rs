@@ -25,14 +25,14 @@ fn main() {
 
     let query: Vec<String> = env::args().collect();
     let res= match get_query_param!(&query, QUERY_TYPE_INDEX, empty!()).as_str() {
-        "g" => games_query(&query),
-        "r" => season_games_query(&query),
-        "u" => season_games_query(&query),
-        "s" => stats_query(&query),
-        "t" => display_team_stats(&query),
-        "l" => display_leaders(&query),
-        "b" => display_league_averages(&query, true),
-        "p" => display_league_averages(&query, false),
+        "g" | "games" => games_query(&query),
+        "r" | "results" => season_games_query(&query),
+        "u" | "schedule" => season_games_query(&query),
+        "s" | "stats" => stats_query(&query),
+        "t" | "teams" => display_team_stats(&query),
+        "l" | "leaders" => display_leaders(&query),
+        "b" | "league-batting-stats" => display_league_averages(&query, true),
+        "p" | "league-pitching-stats" => display_league_averages(&query, false),
         "update" => update_database(&query),
         _ => display_standings()
     };

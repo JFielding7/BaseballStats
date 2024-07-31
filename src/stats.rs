@@ -104,7 +104,7 @@ pub(crate) fn get_entry(file: &String, key: &String, id_len: usize) -> Result<Ve
 
 pub(crate) fn stats_query(query: &Vec<String>) -> Result<(), QueryError> {
     const PLAYER_INDEX: usize = 2;
-    const SEASON_INDEX: usize = 3;
+    const SEASON_TYPE_INDEX: usize = 3;
     const MIN_LENGTH: usize = 3;
     const ID_LEN: usize = 6;
     const IS_PITCHER_INDEX: usize = 1;
@@ -115,7 +115,7 @@ pub(crate) fn stats_query(query: &Vec<String>) -> Result<(), QueryError> {
     }
 
     let default_season_type: &String = &"s".to_string();
-    let season_type: &str = match get_query_param!(query, SEASON_INDEX, default_season_type).as_str() {
+    let season_type: &str = match get_query_param!(query, SEASON_TYPE_INDEX, default_season_type).as_str() {
         "c" => "career",
         "y" => "yearByYear",
         _ => "season"

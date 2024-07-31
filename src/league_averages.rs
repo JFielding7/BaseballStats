@@ -29,7 +29,8 @@ pub(crate) fn display_league_averages(query: &Vec<String>, is_batting: bool) -> 
     let (url, header, stat_header) = if is_batting { batting_url!() }
     else { pitching_url!() };
 
-    let row_count = if get_query_param!(query, ALL_TIME_INDEX, empty!()) == "a" { -1 } else { 1 };
+    let all_time = get_query_param!(query, ALL_TIME_INDEX, empty!());
+    let row_count = if all_time == "a" || all_time == "all-time" { -1 } else { 1 };
 
     let stats = reqwest::blocking::get(url)?.text()?;
 
