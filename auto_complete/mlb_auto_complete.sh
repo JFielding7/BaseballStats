@@ -1,5 +1,5 @@
 function read_file {
-    readarray -t key_array < "/home/joe/RustroverProjects/mlb/auto_complete/$1.txt"
+    readarray -t key_array < "${MLB_PATH}auto_complete/$1.txt"
     keys=" ${key_array[*]} "
 }
 
@@ -42,7 +42,7 @@ function mlb_auto_complete {
 }
 
 function mlb {
-    cargo run --manifest-path /home/joe/RustroverProjects/mlb/Cargo.toml --release "$@"
+    cargo run --manifest-path "${MLB_PATH}Cargo.toml" --release "$@"
 }
 
 complete -F mlb_auto_complete mlb
