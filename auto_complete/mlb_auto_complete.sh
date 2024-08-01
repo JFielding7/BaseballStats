@@ -4,6 +4,8 @@ function read_file {
 }
 
 function mlb_auto_complete {
+    reply=""
+
     if [[ $COMP_CWORD = 1 ]]; then
         reply="games results schedule stats teams leaders league-batting-stats league-pitching-stats update"
     elif [[ $COMP_CWORD = 2 ]]; then
@@ -28,7 +30,7 @@ function mlb_auto_complete {
         if [[ $query_type == "s" || $query_type == "stats" ]]; then
             read_file "players"
             if [[ $keys =~ $input ]]; then
-                reply="career yearByYear season"
+                reply="career year-by-year season"
             fi
         elif [[ $query_type == "t" || $query_type == "teams" ]]; then
             read_file "teams"

@@ -72,8 +72,28 @@ struct DateTime {
 
 #[derive(Deserialize)]
 struct LiveData {
+    plays: Plays,
     linescore: LineScore,
-    // boxscore: BoxScore
+}
+
+#[derive(Deserialize)]
+struct Plays {
+    currentPlay: Option<Play>
+}
+
+#[derive(Deserialize)]
+struct Play {
+    runners: Vec<Runner>
+}
+
+#[derive(Deserialize)]
+struct Runner {
+    movement: Movement
+}
+
+#[derive(Deserialize)]
+struct Movement {
+    end: Option<String>
 }
 
 #[derive(Deserialize)]
@@ -83,7 +103,13 @@ struct LineScore {
     #[serde(default)]
     inningState: String,
     #[serde(default)]
-    currentInningOrdinal: String
+    currentInningOrdinal: String,
+    #[serde(default)]
+    outs: i32,
+    #[serde(default)]
+    balls: i32,
+    #[serde(default)]
+    strikes: i32
 }
 
 #[derive(Deserialize)]
@@ -305,7 +331,18 @@ fn get_game_state(feed: &Feed) -> String {
         "Final" => "Final".to_string(),
         "Live" => {
             let line_score = &feed.liveData.linescore;
-            format!("{} {}", line_score.inningState, line_score.currentInningOrdinal)
+            let bases: Vec<String> = feed.liveData.plays.currentPlay.as_ref()
+                .unwrap_or(&Play { runners: Vec::new() }).runners
+                .iter().filter_map(|runner| {
+                match &runner.movement.end {
+                    Some(bases) => Some(bases.clone()),
+                    None => None
+                }
+            }).collect();
+            format!("{} {}    {}-{}    {} Out    Bases: {}",  line_score.inningState,
+                    line_score.currentInningOrdinal, line_score.balls, line_score.strikes,
+                    line_score.outs, bases.join(", ")
+            )
         },
         "Preview" => {
             let date_time = &feed.gameData.datetime;

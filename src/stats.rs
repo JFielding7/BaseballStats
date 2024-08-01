@@ -116,8 +116,8 @@ pub(crate) fn stats_query(query: &Vec<String>) -> Result<(), QueryError> {
 
     let default_season_type: &String = &"s".to_string();
     let season_type: &str = match get_query_param!(query, SEASON_TYPE_INDEX, default_season_type).as_str() {
-        "c" => "career",
-        "y" => "yearByYear",
+        "c" | "career" => "career",
+        "y" | "year-by-year" => "yearByYear",
         _ => "season"
     };
 
