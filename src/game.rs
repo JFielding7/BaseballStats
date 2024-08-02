@@ -213,7 +213,7 @@ macro_rules! game_feed_url {
 
 macro_rules! season_games_url {
     ($team_id:expr, $season:expr) => {
-        format!("https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={}&gameType=R&season={}", $team_id, $season)
+        format!("https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId={}&season={}", $team_id, $season)
     };
 }
 
@@ -301,14 +301,15 @@ macro_rules! display_record {
 }
 
 macro_rules! upcoming_game {
-    ($away_team:expr, $away_record:expr, $home_team:expr, $home_record:expr, $feed:expr) => {
-        row!(
+    ($away_team:expr, $away_record:expr, $home_team:expr, $home_record:expr, $feed:expr, $middle0:expr, $middle1:expr, $middle2:expr) => {{
+        let mut row = vec![
             format!("{} ({}-{})", $away_team.team.name, $away_record.wins, $away_record.losses),
-            "", "@", "",
+            $middle0.to_string(), $middle1.to_string(), $middle2.to_string(),
             format!("{} ({}-{})", $home_team.team.name, $home_record.wins, $home_record.losses),
-            get_game_state(&$feed)
-        )
-    };
+        ];
+        row.append(&mut get_game_state(&$feed));
+        Row::new(row)
+    }};
 }
 
 fn get_eastern_standard_time(date_time: &String) -> String {
@@ -326,9 +327,9 @@ fn get_eastern_standard_time(date_time: &String) -> String {
     format!("{}{}{}", hour_12, minutes, time_of_day)
 }
 
-fn get_game_state(feed: &Feed) -> String {
+fn get_game_state(feed: &Feed) -> Vec<String> {
     match feed.gameData.status.abstractGameState.as_str() {
-        "Final" => "Final".to_string(),
+        "Final" => vec!["Final".to_string()],
         "Live" => {
             let line_score = &feed.liveData.linescore;
             let bases: Vec<String> = feed.liveData.plays.currentPlay.as_ref()
@@ -339,16 +340,14 @@ fn get_game_state(feed: &Feed) -> String {
                     None => None
                 }
             }).collect();
-            format!("{} {}    {}-{}    {} Out    Bases: {}",  line_score.inningState,
-                    line_score.currentInningOrdinal, line_score.balls, line_score.strikes,
-                    line_score.outs, bases.join(", ")
-            )
+            vec![
+                format!("{} {}", line_score.inningState, line_score.currentInningOrdinal),
+                format!("{}-{}", line_score.balls, line_score.strikes),
+                format!("{} Out", line_score.outs), format!("Bases: {}", bases.join(", "))
+            ]
         },
-        "Preview" => {
-            let date_time = &feed.gameData.datetime;
-            get_eastern_standard_time(&date_time.dateTime)
-        },
-        _ => "".to_string()
+        "Preview" => vec![get_eastern_standard_time(&feed.gameData.datetime.dateTime)],
+        _ => vec!["".to_string()]
     }
 }
 
@@ -434,7 +433,11 @@ fn display_line_score(game_id: i32, feed: &Feed, line_score: &LineScore, away_te
     innings.add_row(Row::new(away_scores));
     innings.add_row(Row::new(home_scores));
 
-    println!("{}\n{}", get_game_state(&feed), innings.render());
+    println!(
+        "{}\n{}",
+        Table::builder().rows(vec![Row::new(get_game_state(&feed))]).build().render(),
+        innings.render()
+    );
     if &feed.gameData.status.abstractGameState == "Live" {
         display_win_probability(game_id, away_team, home_team)?;
     }
@@ -460,15 +463,17 @@ fn display_games(games: &Vec<Game>) -> reqwest::Result<()> {
         let game_state = &game.status.abstractGameState;
 
         if game_state == "Final" || game_state == "Live" {
-            game_table.add_row(row!(
-                format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
-                away_team.score, "-", home_team.score,
-                format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses),
-                get_game_state(&feed)
-            ));
+            // let mut row = vec![
+            //     format!("{} ({}-{})", away_team.team.name, away_record.wins, away_record.losses),
+            //     away_team.score.to_string(), "-".to_string(), home_team.score.to_string(),
+            //     format!("{} ({}-{})", home_team.team.name, home_record.wins, home_record.losses)
+            // ];
+            // row.append(&mut get_game_state(&feed));
+            // game_table.add_row(Row::new(row));
+            game_table.add_row(upcoming_game!(away_team, away_record, home_team, home_record, feed, away_team.score, "-", home_team.score))
         }
         else {
-            game_table.add_row(upcoming_game!(away_team, away_record, home_team, home_record, feed));
+            game_table.add_row(upcoming_game!(away_team, away_record, home_team, home_record, feed, "", "@", ""));
         }
     }
     println!("{}", game_table.render());
@@ -500,7 +505,7 @@ pub(crate) fn display_game_stats(game_id: i32) -> reqwest::Result<()> {
         let away_record = &away_team.team.record;
         let home_record = &home_team.team.record;
         println!("{}", Table::builder().style(TableStyle::blank())
-            .rows(rows![upcoming_game!(away_team, away_record, home_team, home_record, feed)]).build().render()
+            .rows(rows![upcoming_game!(away_team, away_record, home_team, home_record, feed, "", "@", "")]).build().render()
         );
     }
     else {
@@ -658,7 +663,7 @@ pub(crate) fn season_games_query(query: &Vec<String>) -> Result<(), QueryError> 
     let limit = &query.get(LIMIT_INDEX).unwrap_or(&DEFAULT_LIMIT.to_string()).parse::<usize>().unwrap_or(DEFAULT_LIMIT);
 
     match query[TYPE_INDEX].to_ascii_lowercase().as_str() {
-        "r" => display_past_games(team_id, *limit)?,
+        "r" | "results" => display_past_games(team_id, *limit)?,
         _ => display_schedule(team_id, *limit)?
     }
     Ok(())

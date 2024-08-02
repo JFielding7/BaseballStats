@@ -7,7 +7,7 @@ function mlb_auto_complete {
     reply=""
 
     if [[ $COMP_CWORD = 1 ]]; then
-        reply="games results schedule stats teams leaders league-batting-stats league-pitching-stats update"
+        reply="games results schedule stats teams leaders league-batting-stats league-pitching-stats standings update"
     elif [[ $COMP_CWORD = 2 ]]; then
         case ${COMP_WORDS[1]} in
             "g" | "games" | "r" | "results" | "u" | "schedule" | "t" | "teams")

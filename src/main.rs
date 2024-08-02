@@ -11,7 +11,6 @@ mod query;
 mod league_averages;
 
 use std::{env};
-use std::error::Error;
 use crate::database::update_database;
 use crate::standings::display_standings;
 use crate::game::{games_query, season_games_query};
@@ -40,6 +39,6 @@ fn main() {
 
     match res {
         Ok(_) => {},
-        Err(e) => eprintln!("{:?}", e.source())
+        Err(e) => eprintln!("{e}")
     }
 }
